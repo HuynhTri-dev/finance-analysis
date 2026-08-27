@@ -1,0 +1,792 @@
+openapi: 3.1.0
+
+# ============================================================
+# name: order_service_openapi.yaml
+# description: Full worked example of an OpenAPI 3.1 contract
+#              for the Order Service domain. Demonstrates all 9
+#              API design principles in a realistic context.
+#              This is a READ-ONLY reference example.
+# ============================================================
+
+info:
+  title: Order Service API
+  version: 1.0.0
+  description: >
+    Authoritative contract for the Order Management domain.
+    
+    **Breaking Change Policy**: Any change that removes a field, changes a field type,
+    renames a field, or alters response structure constitutes a breaking change and
+    MUST result in a new major version (/v2). Additive changes (new optional fields,
+    new endpoints) are backward-compatible.
+
+    **Deprecation Policy**: Deprecated operations will carry a `Deprecated: true`
+    flag in this spec and the `Deprecation` + `Sunset` headers in responses.
+    Minimum notice period before removal: 90 days for internal consumers,
+    180 days for external/partner consumers.
+  contact:
+    name: Order Engineering Team
+    email: order-engineering@example.com
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production
+  - url: https://staging-api.example.com/v1
+    description: Staging
+  - url: http://localhost:3000/v1
+    description: Local Development
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Orders
+    description: Core order lifecycle management
+  - name: Order Items
+    description: Line items within an order
+
+paths:
+
+  # ============================================================
+  # Collection: /orders
+  # ============================================================
+  /orders:
+    get:
+      operationId: listOrders
+      summary: List orders with pagination, filtering, and sorting
+      description: >
+        Returns a paginated list of orders. Supports filtering by status,
+        customer, and date range. All list parameters are optional;
+        defaults to the 20 most recent orders.
+      tags:
+        - Orders
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+        - $ref: "#/components/parameters/TraceparentHeader"
+        # Pagination
+        - name: page
+          in: query
+          description: Page number (1-indexed)
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          example: 1
+        - name: limit
+          in: query
+          description: Number of records per page (maximum 100)
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+          example: 20
+        # Sorting
+        - name: sort_by
+          in: query
+          description: Field to sort results by
+          schema:
+            type: string
+            enum: [created_at, updated_at, total_amount]
+            default: created_at
+        - name: sort_order
+          in: query
+          description: Sort direction
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        # Filters
+        - name: status
+          in: query
+          description: Filter by order status
+          schema:
+            type: string
+            enum: [pending, confirmed, processing, shipped, delivered, cancelled, refunded]
+          example: pending
+        - name: customer_id
+          in: query
+          description: Filter orders belonging to a specific customer (UUID)
+          schema:
+            type: string
+            format: uuid
+        - name: created_after
+          in: query
+          description: Filter orders created after this timestamp (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+          example: "2025-01-01T00:00:00Z"
+        - name: created_before
+          in: query
+          description: Filter orders created before this timestamp (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+          example: "2025-12-31T23:59:59Z"
+
+      responses:
+        "200":
+          description: OK — Paginated list of orders
+          headers:
+            X-Request-ID:
+              description: Echo of the request correlation ID
+              schema: { type: string, format: uuid }
+            X-RateLimit-Limit:
+              schema: { type: integer }
+              description: Maximum requests allowed per window
+            X-RateLimit-Remaining:
+              schema: { type: integer }
+              description: Remaining requests in current window
+            X-RateLimit-Reset:
+              schema: { type: integer }
+              description: Unix timestamp when rate limit window resets
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Order"
+                  meta:
+                    $ref: "#/components/schemas/PaginationMeta"
+              example:
+                data:
+                  - id: "550e8400-e29b-41d4-a716-446655440000"
+                    customer_id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+                    status: "pending"
+                    total_amount: 450000
+                    currency: "VND"
+                    items_count: 3
+                    created_at: "2025-06-15T08:30:00Z"
+                    updated_at: "2025-06-15T08:30:00Z"
+                meta:
+                  page: 1
+                  limit: 20
+                  total: 348
+                  total_pages: 18
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      operationId: createOrder
+      summary: Create a new order
+      description: >
+        Creates a new order from the provided line items.
+        This operation is idempotent — the `Idempotency-Key` header MUST be provided.
+        Safe to retry on network failure using the same key.
+        Returns `202 Accepted` immediately; payment processing happens asynchronously.
+      tags:
+        - Orders
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+        - $ref: "#/components/parameters/TraceparentHeader"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderRequest"
+            example:
+              customer_id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              shipping_address:
+                street: "123 Nguyen Hue"
+                city: "Ho Chi Minh City"
+                province: "Ho Chi Minh"
+                postal_code: "700000"
+                country: "VN"
+              items:
+                - product_id: "a3bb189e-8bf9-3888-9912-ace4e6543002"
+                  quantity: 2
+                  unit_price: 150000
+                - product_id: "b5cc290f-9ca0-4999-0a23-bdf5f7654113"
+                  quantity: 1
+                  unit_price: 150000
+              notes: "Please wrap as a gift"
+      responses:
+        "202":
+          description: >
+            Accepted — Order received and queued for processing.
+            Monitor status via GET /orders/{id} or webhook notification.
+          headers:
+            X-Request-ID:
+              schema: { type: string, format: uuid }
+            Location:
+              description: URL to poll for order status
+              schema:
+                type: string
+                example: "/v1/orders/550e8400-e29b-41d4-a716-446655440000"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+              example:
+                id: "550e8400-e29b-41d4-a716-446655440000"
+                status: "pending"
+                total_amount: 450000
+                currency: "VND"
+                created_at: "2025-06-15T08:30:00Z"
+                updated_at: "2025-06-15T08:30:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: >
+            Conflict — Idempotency-Key already used with a different payload.
+            If the payload is identical to the original, returns the original response instead.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                type: "https://api.example.com/errors/idempotency-conflict"
+                title: "Idempotency Key Conflict"
+                status: 409
+                detail: "The provided Idempotency-Key was already used with a different request payload."
+                instance: "/orders"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ============================================================
+  # Single Resource: /orders/{id}
+  # ============================================================
+  /orders/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: UUID v4 identifier of the order
+        schema:
+          type: string
+          format: uuid
+        example: "550e8400-e29b-41d4-a716-446655440000"
+      - $ref: "#/components/parameters/XRequestId"
+      - $ref: "#/components/parameters/TraceparentHeader"
+
+    get:
+      operationId: getOrderById
+      summary: Get a single order by ID
+      tags:
+        - Orders
+      responses:
+        "200":
+          description: OK — Order details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetail"
+              example:
+                id: "550e8400-e29b-41d4-a716-446655440000"
+                customer_id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+                status: "confirmed"
+                total_amount: 450000
+                currency: "VND"
+                shipping_address:
+                  street: "123 Nguyen Hue"
+                  city: "Ho Chi Minh City"
+                  province: "Ho Chi Minh"
+                  postal_code: "700000"
+                  country: "VN"
+                items:
+                  - id: "item-uuid-001"
+                    product_id: "a3bb189e-8bf9-3888-9912-ace4e6543002"
+                    quantity: 2
+                    unit_price: 150000
+                    subtotal: 300000
+                notes: "Please wrap as a gift"
+                created_at: "2025-06-15T08:30:00Z"
+                updated_at: "2025-06-15T08:35:00Z"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    patch:
+      operationId: updateOrder
+      summary: Partially update an order
+      description: >
+        Supports partial updates. Only provided fields are updated.
+        Status transitions are validated server-side against the order state machine.
+        Not all status transitions are permitted (e.g., cannot transition from `delivered` to `pending`).
+      tags:
+        - Orders
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrderRequest"
+            example:
+              status: "cancelled"
+              notes: "Customer requested cancellation via support chat"
+      responses:
+        "200":
+          description: OK — Updated order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          description: >
+            Unprocessable Entity — Invalid status transition or business rule violation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                type: "https://api.example.com/errors/invalid-status-transition"
+                title: "Invalid Status Transition"
+                status: 422
+                detail: "Cannot transition order from 'delivered' to 'pending'."
+                instance: "/orders/550e8400-e29b-41d4-a716-446655440000"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ============================================================
+  # Nested: /orders/{id}/items — Order line items (read-only)
+  # ============================================================
+  /orders/{id}/items:
+    get:
+      operationId: listOrderItems
+      summary: List all items within a specific order
+      tags:
+        - Order Items
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/XRequestId"
+      responses:
+        "200":
+          description: OK — List of order items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OrderItem"
+                  meta:
+                    $ref: "#/components/schemas/PaginationMeta"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+# =============================================================
+# COMPONENTS
+# =============================================================
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        JWT issued by the Auth Service. 
+        Required claims: sub (user UUID), roles[], exp, iat.
+        Tokens expire after 15 minutes. Use refresh token flow for renewal.
+
+  parameters:
+    XRequestId:
+      name: X-Request-ID
+      in: header
+      required: false
+      description: >
+        Client-provided correlation ID (UUID v4) for distributed tracing.
+        Generated by client; if absent, server generates and logs one.
+        Always echoed back in the response.
+      schema:
+        type: string
+        format: uuid
+
+    TraceparentHeader:
+      name: traceparent
+      in: header
+      required: false
+      description: >
+        W3C Trace Context header for distributed tracing with OpenTelemetry.
+        Format: 00-{trace-id}-{parent-id}-{flags}
+      schema:
+        type: string
+        pattern: "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"
+
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: >
+        Client-generated UUID v4 for idempotent request processing.
+        Same key + same payload = same response (cached for 24h).
+        Same key + different payload = 409 Conflict.
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Bad Request — Malformed syntax or invalid parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            type: "https://api.example.com/errors/bad-request"
+            title: "Bad Request"
+            status: 400
+            detail: "Request body contains invalid JSON."
+            instance: "/orders"
+
+    Unauthorized:
+      description: Unauthorized — Missing or invalid Bearer token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            type: "https://api.example.com/errors/unauthorized"
+            title: "Unauthorized"
+            status: 401
+            detail: "A valid Bearer token is required to access this resource."
+            instance: "/orders"
+
+    Forbidden:
+      description: Forbidden — Token valid but insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            type: "https://api.example.com/errors/forbidden"
+            title: "Forbidden"
+            status: 403
+            detail: "You do not have permission to access orders belonging to other customers."
+            instance: "/orders/550e8400-e29b-41d4-a716-446655440000"
+
+    NotFound:
+      description: Not Found — The requested resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            type: "https://api.example.com/errors/not-found"
+            title: "Order Not Found"
+            status: 404
+            detail: "Order with ID 550e8400-e29b-41d4-a716-446655440000 does not exist."
+            instance: "/orders/550e8400-e29b-41d4-a716-446655440000"
+
+    UnprocessableEntity:
+      description: Unprocessable Entity — Business rule validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationError"
+          example:
+            type: "https://api.example.com/errors/validation-failed"
+            title: "Validation Failed"
+            status: 422
+            detail: "One or more fields failed validation."
+            instance: "/orders"
+            errors:
+              - field: "items[0].quantity"
+                message: "Quantity must be at least 1."
+              - field: "items[1].product_id"
+                message: "Product ID a3bb189e-invalid does not exist."
+
+    TooManyRequests:
+      description: Too Many Requests — Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          schema: { type: integer }
+        X-RateLimit-Remaining:
+          schema: { type: integer }
+        X-RateLimit-Reset:
+          schema: { type: integer }
+        Retry-After:
+          schema: { type: integer }
+          description: Seconds until the rate limit resets
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            type: "https://api.example.com/errors/rate-limit-exceeded"
+            title: "Rate Limit Exceeded"
+            status: 429
+            detail: "You have exceeded the limit of 100 requests per minute. Retry after 45 seconds."
+            instance: "/orders"
+
+    InternalServerError:
+      description: Internal Server Error — Unexpected server failure
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            type: "https://api.example.com/errors/internal-server-error"
+            title: "Internal Server Error"
+            status: 500
+            detail: "An unexpected error occurred. The issue has been logged."
+            instance: "/orders"
+            request_id: "550e8400-e29b-41d4-a716-446655440000"
+
+  schemas:
+
+    # ---- RFC 7807 Problem Details ----
+    Error:
+      type: object
+      required: [type, title, status, detail, instance]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: URI identifying the error type
+        title:
+          type: string
+          description: Short, stable, human-readable summary
+        status:
+          type: integer
+          description: HTTP status code
+        detail:
+          type: string
+          description: Human-readable, instance-specific explanation
+        instance:
+          type: string
+          description: URI of the request that caused the problem
+        request_id:
+          type: string
+          format: uuid
+          description: Correlation ID for tracing
+
+    ValidationError:
+      allOf:
+        - $ref: "#/components/schemas/Error"
+        - type: object
+          properties:
+            errors:
+              type: array
+              items:
+                type: object
+                required: [field, message]
+                properties:
+                  field:
+                    type: string
+                    description: The field that failed validation (dot notation for nested)
+                    example: "items[0].quantity"
+                  message:
+                    type: string
+                    description: Human-readable validation failure reason
+                    example: "Must be at least 1."
+
+    # ---- Pagination ----
+    PaginationMeta:
+      type: object
+      required: [page, limit, total, total_pages]
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          description: Total number of matching records
+          example: 348
+        total_pages:
+          type: integer
+          example: 18
+
+    # ---- Domain Schemas ----
+    Address:
+      type: object
+      required: [street, city, province, country]
+      properties:
+        street:
+          type: string
+          example: "123 Nguyen Hue"
+        city:
+          type: string
+          example: "Ho Chi Minh City"
+        province:
+          type: string
+          example: "Ho Chi Minh"
+        postal_code:
+          type: string
+          example: "700000"
+        country:
+          type: string
+          description: ISO 3166-1 alpha-2 country code
+          example: "VN"
+
+    OrderItem:
+      type: object
+      required: [id, product_id, quantity, unit_price, subtotal]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        product_id:
+          type: string
+          format: uuid
+        product_name:
+          type: string
+          description: Snapshot of product name at time of order creation
+          example: "Premium Wireless Headphones"
+        quantity:
+          type: integer
+          minimum: 1
+          example: 2
+        unit_price:
+          type: integer
+          description: Price per unit in smallest currency unit (e.g., VND)
+          example: 150000
+        subtotal:
+          type: integer
+          description: quantity × unit_price
+          readOnly: true
+          example: 300000
+
+    Order:
+      type: object
+      required: [id, customer_id, status, total_amount, currency, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+          description: UUID v4 — never expose sequential integer IDs
+        customer_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, confirmed, processing, shipped, delivered, cancelled, refunded]
+          description: >
+            Order state machine:
+            pending → confirmed → processing → shipped → delivered
+            Any state → cancelled (before shipped)
+            delivered → refunded
+        total_amount:
+          type: integer
+          description: Total order value in smallest currency unit
+          example: 450000
+        currency:
+          type: string
+          description: ISO 4217 currency code
+          example: "VND"
+        items_count:
+          type: integer
+          readOnly: true
+          description: Summary count of line items (use GET /orders/{id}/items for full list)
+          example: 3
+        notes:
+          type: string
+          description: Customer-provided order notes (optional)
+          maxLength: 500
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+
+    OrderDetail:
+      allOf:
+        - $ref: "#/components/schemas/Order"
+        - type: object
+          properties:
+            shipping_address:
+              $ref: "#/components/schemas/Address"
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/OrderItem"
+
+    CreateOrderRequest:
+      type: object
+      required: [customer_id, items]
+      properties:
+        customer_id:
+          type: string
+          format: uuid
+          description: UUID of the customer placing the order
+        shipping_address:
+          $ref: "#/components/schemas/Address"
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [product_id, quantity, unit_price]
+            properties:
+              product_id:
+                type: string
+                format: uuid
+              quantity:
+                type: integer
+                minimum: 1
+              unit_price:
+                type: integer
+                minimum: 0
+                description: Agreed price per unit at time of order
+        notes:
+          type: string
+          maxLength: 500
+
+    UpdateOrderRequest:
+      type: object
+      description: All fields are optional — only provided fields are updated (PATCH semantics)
+      properties:
+        status:
+          type: string
+          enum: [confirmed, processing, shipped, delivered, cancelled, refunded]
+          description: >
+            Valid status transitions only. Invalid transitions return 422.
+        notes:
+          type: string
+          maxLength: 500

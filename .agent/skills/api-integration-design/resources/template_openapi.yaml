@@ -1,0 +1,501 @@
+openapi: 3.1.0
+
+# ============================================================
+# name: template_openapi.yaml
+# description: Reusable OpenAPI 3.1 base template for any service.
+#              Replace all [PLACEHOLDERS] with actual values.
+#              This template enforces all 9 API Design Principles.
+# ============================================================
+
+info:
+  title: "[SERVICE_NAME] API"
+  version: 1.0.0
+  description: >
+    Contract for the [DOMAIN_NAME] domain.
+    Any breaking changes (field removal, type changes, behavior changes)
+    MUST bump the major version and go through the deprecation workflow.
+    Additive changes (new optional fields, new endpoints) are backward-compatible
+    and do not require a version bump.
+  contact:
+    name: "[TEAM_NAME] Engineering"
+    email: "[TEAM_EMAIL]"
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production
+  - url: https://staging-api.example.com/v1
+    description: Staging
+
+# =============================================================
+# Global Security: All endpoints require JWT Bearer by default.
+# Override per-endpoint if some are public.
+# =============================================================
+security:
+  - bearerAuth: []
+
+paths:
+  # -----------------------------------------------------------
+  # GET  /[resources]     → List with pagination/filter/sort
+  # POST /[resources]     → Create with Idempotency-Key
+  # -----------------------------------------------------------
+  /[resources]:
+    get:
+      operationId: list[Resources]
+      summary: "List [resources] with pagination, filtering, and sorting"
+      tags:
+        - "[Resource]"
+      parameters:
+        # --- Observability ---
+        - $ref: "#/components/parameters/XRequestId"
+        # --- Pagination ---
+        - name: page
+          in: query
+          description: Page number (1-indexed)
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          description: Items per page (max 100)
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        # --- Sorting ---
+        - name: sort_by
+          in: query
+          description: Field to sort by
+          schema:
+            type: string
+            enum: [created_at, updated_at]
+            default: created_at
+        - name: sort_order
+          in: query
+          description: Sort direction
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        # --- Filtering (add domain-specific filters below) ---
+        - name: status
+          in: query
+          description: Filter by status
+          schema:
+            type: string
+            enum: [pending, active, cancelled]
+      responses:
+        "200":
+          description: OK — Paginated list of [resources]
+          headers:
+            X-Request-ID:
+              description: Echo of the client-provided or server-generated request ID
+              schema:
+                type: string
+                format: uuid
+            X-RateLimit-Limit:
+              description: Request limit per window
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              description: Remaining requests in current window
+              schema:
+                type: integer
+            X-RateLimit-Reset:
+              description: Unix timestamp when the rate limit window resets
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedResponse"
+              example:
+                data:
+                  - id: "550e8400-e29b-41d4-a716-446655440000"
+                    status: "active"
+                    created_at: "2025-01-15T08:30:00Z"
+                meta:
+                  page: 1
+                  limit: 20
+                  total: 348
+                  total_pages: 18
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      operationId: create[Resource]
+      summary: "Create a new [resource]"
+      tags:
+        - "[Resource]"
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Create[Resource]Request"
+            example:
+              # Add a realistic example here
+              field_one: "example_value"
+      responses:
+        "201":
+          description: Created — [Resource] successfully created
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+                format: uuid
+            Location:
+              description: URL of the newly created resource
+              schema:
+                type: string
+                example: "/v1/[resources]/550e8400-e29b-41d4-a716-446655440000"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/[Resource]"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: >
+            Conflict — Idempotency-Key already exists with a different payload.
+            Return the original response if payload is identical.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # -----------------------------------------------------------
+  # GET    /[resources]/{id}  → Read single resource
+  # PATCH  /[resources]/{id}  → Partial update
+  # DELETE /[resources]/{id}  → Remove
+  # -----------------------------------------------------------
+  /[resources]/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: UUID of the [resource]
+        schema:
+          type: string
+          format: uuid
+      - $ref: "#/components/parameters/XRequestId"
+
+    get:
+      operationId: get[Resource]ById
+      summary: "Get a single [resource] by ID"
+      tags:
+        - "[Resource]"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/[Resource]"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    patch:
+      operationId: update[Resource]
+      summary: "Partially update a [resource]"
+      tags:
+        - "[Resource]"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Update[Resource]Request"
+      responses:
+        "200":
+          description: OK — Updated [resource]
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/[Resource]"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    delete:
+      operationId: delete[Resource]
+      summary: "Delete a [resource]"
+      tags:
+        - "[Resource]"
+      responses:
+        "204":
+          description: No Content — Successfully deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+# =============================================================
+# COMPONENTS
+# =============================================================
+components:
+
+  # --- Security Schemes ---
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        JWT issued by the Auth Service. Include as: Authorization: Bearer <token>.
+        Token must contain: sub (user UUID), roles, exp (expiry), iat (issued at).
+
+  # --- Reusable Parameters ---
+  parameters:
+    XRequestId:
+      name: X-Request-ID
+      in: header
+      required: false
+      description: >
+        Client-provided request correlation ID (UUID v4).
+        If absent, the server generates and logs one.
+        Always echoed back in the response header.
+      schema:
+        type: string
+        format: uuid
+
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: >
+        Client-generated UUID v4 to ensure idempotency.
+        Safe to retry on network failure with the same key.
+        Key + response stored for 24 hours.
+        409 is returned if the same key is used with a different payload.
+      schema:
+        type: string
+        format: uuid
+
+  # --- Reusable Responses ---
+  responses:
+    BadRequest:
+      description: Bad Request — Malformed or invalid input
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    Unauthorized:
+      description: Unauthorized — Missing or invalid authentication token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    Forbidden:
+      description: Forbidden — Authenticated but not authorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    NotFound:
+      description: Not Found — Resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    UnprocessableEntity:
+      description: Unprocessable Entity — Business rule validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationError"
+
+    TooManyRequests:
+      description: Too Many Requests — Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds to wait before retrying
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    InternalServerError:
+      description: Internal Server Error — Unexpected server failure
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  # --- Reusable Schemas ---
+  schemas:
+
+    # RFC 7807 Problem Details — Standard error envelope
+    Error:
+      type: object
+      required: [type, title, status, detail, instance]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: URI identifying the error type
+          example: "https://api.example.com/errors/not-found"
+        title:
+          type: string
+          description: Short, stable human-readable error summary
+          example: "Resource Not Found"
+        status:
+          type: integer
+          description: HTTP status code
+          example: 404
+        detail:
+          type: string
+          description: Human-readable, instance-specific explanation
+          example: "Order with ID 550e8400-e29b-41d4-a716-446655440000 does not exist."
+        instance:
+          type: string
+          description: URI of the specific request that caused the error
+          example: "/orders/550e8400-e29b-41d4-a716-446655440000"
+        request_id:
+          type: string
+          format: uuid
+          description: Correlation ID for distributed tracing
+
+    # Extended error for validation failures (422)
+    ValidationError:
+      allOf:
+        - $ref: "#/components/schemas/Error"
+        - type: object
+          properties:
+            errors:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                    example: "email"
+                  message:
+                    type: string
+                    example: "Must be a valid email address."
+
+    # Standard paginated response wrapper
+    PaginatedResponse:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items: {}
+          description: Array of resource objects
+        meta:
+          type: object
+          required: [page, limit, total, total_pages]
+          properties:
+            page:
+              type: integer
+              example: 1
+            limit:
+              type: integer
+              example: 20
+            total:
+              type: integer
+              description: Total number of matching records
+              example: 348
+            total_pages:
+              type: integer
+              example: 18
+
+    # ---- Domain-Specific Schemas ----
+    # Replace [Resource] with your actual resource name (e.g., Order, Payment)
+
+    "[Resource]":
+      type: object
+      required: [id, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique resource identifier (UUID v4)
+          readOnly: true
+        status:
+          type: string
+          enum: [pending, active, cancelled]
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        # Add domain-specific fields below
+
+    "Create[Resource]Request":
+      type: object
+      required: []  # List mandatory fields
+      properties:
+        # Add fields required for creation
+        field_one:
+          type: string
+          description: "[Describe field_one]"
+
+    "Update[Resource]Request":
+      type: object
+      description: All fields are optional for partial update (PATCH semantics)
+      properties:
+        # Add updateable fields
+        field_one:
+          type: string
+          description: "[Describe field_one]"

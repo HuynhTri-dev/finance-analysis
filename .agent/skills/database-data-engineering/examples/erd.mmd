@@ -1,0 +1,128 @@
+erDiagram
+    %% ==========================================
+    %% E-COMMERCE PLATFORM ERD SAMPLE
+    %% ==========================================
+
+    USERS ||--o{ USER_ADDRESSES : "has many"
+    USERS ||--o{ ORDERS : "places"
+    USERS ||--o{ REVIEWS : "writes"
+    
+    USERS {
+        uuid id PK
+        string email UK "User email (unique natural key)"
+        string password_hash "Argon2 / BCrypt hash"
+        string full_name "Customer full name"
+        string phone "Contact phone number"
+        string status "ACTIVE, INACTIVE, BLOCKED"
+        timestamp created_at "Account creation timestamp"
+        timestamp updated_at "Last update timestamp"
+    }
+
+    USER_ADDRESSES {
+        uuid id PK
+        uuid user_id FK "References USERS(id)"
+        string recipient_name "Name of person receiving goods"
+        string phone "Contact number for delivery"
+        string street_address "House number & street name"
+        string city "City or Province"
+        string country "ISO country code (e.g. VN, US)"
+        boolean is_default "Default delivery address flag"
+    }
+
+    CATEGORIES ||--o{ CATEGORIES : "parent of (hierarchical)"
+    CATEGORIES ||--o{ PRODUCTS : "contains"
+    
+    CATEGORIES {
+        uuid id PK
+        uuid parent_id FK "Self-referencing FK for sub-categories"
+        string name "Category name"
+        string slug UK "URL slug"
+        boolean is_active "Active status"
+    }
+
+    PRODUCTS ||--o{ PRODUCT_IMAGES : "has gallery"
+    PRODUCTS ||--o{ ORDER_ITEMS : "referenced in"
+    PRODUCTS ||--o{ REVIEWS : "receives"
+
+    PRODUCTS {
+        uuid id PK
+        uuid category_id FK "References CATEGORIES(id)"
+        string sku UK "Stock Keeping Unit"
+        string name "Product title"
+        string slug UK "SEO friendly URL slug"
+        decimal base_price "Current retail price"
+        integer stock_quantity "Inventory count"
+        string status "DRAFT, PUBLISHED, OUT_OF_STOCK, ARCHIVED"
+        timestamp created_at "Timestamp"
+    }
+
+    PRODUCT_IMAGES {
+        uuid id PK
+        uuid product_id FK "References PRODUCTS(id)"
+        string image_url "CDN link"
+        integer display_order "Sorting order"
+        boolean is_thumbnail "Primary thumbnail flag"
+    }
+
+    ORDERS ||--|{ ORDER_ITEMS : "contains"
+    ORDERS ||--o{ ORDER_STATUS_HISTORY : "tracks history"
+    ORDERS ||--o| PAYMENTS : "paid via"
+    ORDERS ||--o| SHIPMENTS : "fulfilled by"
+
+    ORDERS {
+        uuid id PK
+        uuid user_id FK "References USERS(id)"
+        string order_number UK "Business order code (e.g. ORD-20260825-001)"
+        string status "PENDING, PAID, PROCESSING, SHIPPED, DELIVERED, CANCELLED"
+        decimal total_amount "Total order cost including tax/shipping"
+        decimal shipping_fee "Delivery fee snapshot"
+        string shipping_address_snapshot "JSON/Text snapshot of delivery address"
+        timestamp created_at "Order placement time"
+    }
+
+    ORDER_ITEMS {
+        uuid id PK
+        uuid order_id FK "References ORDERS(id)"
+        uuid product_id FK "References PRODUCTS(id)"
+        integer quantity "Units purchased (CHECK > 0)"
+        decimal unit_price_snapshot "Price at time of purchase"
+        decimal subtotal "Computed line total (quantity * unit_price_snapshot)"
+    }
+
+    ORDER_STATUS_HISTORY {
+        uuid id PK
+        uuid order_id FK "References ORDERS(id)"
+        string old_status "Previous status"
+        string new_status "Updated status"
+        uuid changed_by FK "User/Admin ID who triggered the change"
+        timestamp changed_at "Timestamp of status transition"
+    }
+
+    PAYMENTS {
+        uuid id PK
+        uuid order_id FK,UK "1:1 mapping with ORDER"
+        string provider "VNPAY, STRIPE, PAYPAL, COD"
+        string transaction_code "Gateway transaction ID"
+        decimal amount "Payment amount"
+        string status "PENDING, SUCCESS, FAILED, REFUNDED"
+        timestamp paid_at "Payment confirmation timestamp"
+    }
+
+    SHIPMENTS {
+        uuid id PK
+        uuid order_id FK,UK "1:1 mapping with ORDER"
+        string carrier "GHN, GHTK, FEDEX, DHL"
+        string tracking_code "Carrier tracking number"
+        string status "READY_TO_PICK, IN_TRANSIT, DELIVERED, RETURNED"
+        timestamp shipped_at "Dispatch timestamp"
+        timestamp estimated_delivery "Estimated delivery date"
+    }
+
+    REVIEWS {
+        uuid id PK
+        uuid product_id FK "References PRODUCTS(id)"
+        uuid user_id FK "References USERS(id)"
+        integer rating "Star score 1 to 5 (CHECK 1..5)"
+        string comment "User review text"
+        timestamp created_at "Review creation timestamp"
+    }

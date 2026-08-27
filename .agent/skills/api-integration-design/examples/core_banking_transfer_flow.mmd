@@ -1,0 +1,105 @@
+sequenceDiagram
+    autonumber
+
+    actor Client as Mobile Banking / Channel
+    participant GW as API Gateway and WAF (mTLS / JWT RS256)
+    participant CoreApi as Core Banking API Service
+    participant Redis as Redis (Idempotency / Redlock)
+    participant CoreDB as Core Ledger DB (PostgreSQL / Oracle)
+    participant Outbox as Transactional Outbox
+    participant Queue as Event Bus / MQ (Kafka)
+    participant InterbankWorker as Clearing Worker
+    participant ClearingSwitch as Interbank Switch (NAPAS 24/7 / SWIFT)
+    participant ReconJob as Reconciliation Job (EOD Batch)
+
+    %% PHASE 1: Authentication & Idempotent Ingestion
+    rect rgb(235, 245, 255)
+        Note over Client, Redis: PHASE 1 — API Ingestion & Idempotency Verification
+
+        Client->>GW: POST /v1/transfers (Headers: Authorization, Idempotency-Key, X-Request-ID)
+        GW->>GW: Verify mTLS cert and JWT signature (RS256)
+        GW->>CoreApi: Forward sanitized request
+
+        CoreApi->>Redis: SETNX idempotency:{key} (TTL: 48h)
+        alt Duplicate Idempotency-Key Found
+            Redis-->>CoreApi: Key exists: Return cached transfer payload
+            CoreApi-->>Client: 200 OK / 202 Accepted (Cached response)
+        else Fresh Idempotency-Key
+            Redis-->>CoreApi: Lock Acquired (Proceed)
+        end
+    end
+
+    %% PHASE 2: Balance Lock & Double-Entry Ledger Posting
+    rect rgb(240, 255, 240)
+        Note over CoreApi, CoreDB: PHASE 2 — ACID Double-Entry Posting & State Transition
+
+        CoreApi->>CoreDB: BEGIN TRANSACTION (ISOLATION LEVEL: REPEATABLE READ)
+        CoreApi->>CoreDB: SELECT * FROM accounts WHERE id = :source_id FOR UPDATE
+        
+        alt Insufficient Available Balance or Account Frozen
+            CoreDB-->>CoreApi: Balance < Amount OR Status != ACTIVE
+            CoreApi->>CoreDB: ROLLBACK
+            CoreApi->>Redis: DEL idempotency:{key}
+            CoreApi-->>Client: 409 Conflict (RFC 7807: Insufficient Available Funds)
+        else Sufficient Balance & Active Account
+            Note over CoreDB: Double-Entry: Debits = Credits
+            CoreApi->>CoreDB: INSERT INTO journals (transfer_ref, currency, amount)
+            CoreApi->>CoreDB: INSERT INTO ledger_entries (source_account, type=DEBIT, amount)
+            
+            alt Route A: Internal Book Transfer (Within Bank)
+                CoreApi->>CoreDB: INSERT INTO ledger_entries (dest_account, type=CREDIT, amount)
+                CoreApi->>CoreDB: UPDATE transfers SET status = COMPLETED
+                CoreApi->>CoreDB: COMMIT TRANSACTION
+                CoreDB-->>CoreApi: Transaction Committed Successfully
+                CoreApi-->>Client: 201 Created {status: completed, transfer_id: uuid, balance_after: amount}
+                
+            else Route B: Interbank Transfer (NAPAS 24/7 / External Bank)
+                CoreApi->>CoreDB: INSERT INTO ledger_entries (clearing_nostro_account, type=CREDIT, amount)
+                CoreApi->>CoreDB: INSERT INTO outbox_messages (topic=interbank-transfers, payload)
+                CoreApi->>CoreDB: UPDATE transfers SET status = PROCESSING
+                CoreApi->>CoreDB: COMMIT TRANSACTION
+                CoreDB-->>CoreApi: Transaction Committed and Outbox Written
+                CoreApi-->>Client: 202 Accepted {status: processing, transfer_id: uuid}
+            end
+        end
+    end
+
+    %% PHASE 3: Asynchronous Interbank Clearing Execution
+    rect rgb(255, 250, 230)
+        Note over Outbox, ClearingSwitch: PHASE 3 — Outbox Relay & Interbank Switch Exchange (Route B)
+
+        Outbox->>Queue: CDC / Poller reads Outbox and Publishes to Kafka
+        Queue->>InterbankWorker: Consume transfer clearing job
+        InterbankWorker->>ClearingSwitch: ISO 20022 PACS.008 Payment Message (Timeout: 5s)
+        
+        alt External Switch Response: SUCCESS (00)
+            ClearingSwitch-->>InterbankWorker: ISO 20022 PACS.002 Success
+            InterbankWorker->>CoreDB: UPDATE transfers SET status = COMPLETED, switch_ref = NP-998811
+            InterbankWorker->>Queue: EMIT TransferCompletedEvent (Push notification to customer)
+        else External Switch Response: TIMEOUT / SYSTEM_ERROR
+            InterbankWorker->>InterbankWorker: Exponential Backoff and Retry (Max 3 times)
+            InterbankWorker->>ClearingSwitch: Inquiry Transaction Status (PACS.028)
+        else External Switch Response: REJECT (Invalid Beneficiary / Account Closed)
+            ClearingSwitch-->>InterbankWorker: ISO 20022 PACS.002 Reject (Reason: AC01)
+            InterbankWorker->>CoreDB: BEGIN REVERSAL TRANSACTION
+            InterbankWorker->>CoreDB: INSERT reversal ledger entries (Credit Source, Debit Clearing Nostro)
+            InterbankWorker->>CoreDB: UPDATE transfers SET status = REVERSED, failure_reason = Beneficiary account invalid
+            InterbankWorker->>CoreDB: COMMIT TRANSACTION
+            InterbankWorker->>Queue: EMIT TransferFailedEvent (Push alert to customer)
+        end
+    end
+
+    %% PHASE 4: End-of-Day Reconciliation & Settlement
+    rect rgb(255, 235, 235)
+        Note over ReconJob, ClearingSwitch: PHASE 4 — EOD Automated Reconciliation & Balancing
+
+        ReconJob->>ClearingSwitch: Download EOD Clearing Settlement File (.dat / .csv)
+        ReconJob->>CoreDB: Fetch internal ledger clearing entries for T
+        ReconJob->>ReconJob: 3-Way Match (Internal Ledger vs Switch Records vs Nostro Statement)
+        
+        alt All Records Match
+            ReconJob->>CoreDB: Mark Settlement Batch as BALANCED
+        else Discrepancy Found (Unsettled / Dropped)
+            ReconJob->>CoreDB: Flag Exception in Suspense Account and Alert Treasury Ops
+        end
+    end
