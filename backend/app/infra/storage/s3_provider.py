@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 name: s3_provider.py
 description: Physical storage provider implementation using aioboto3

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 LLM Gateway — Multi-platform with configurable fallback chains.
 

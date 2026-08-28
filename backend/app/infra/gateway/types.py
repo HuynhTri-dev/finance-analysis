@@ -6,10 +6,18 @@ Description: Dataclasses, enums, and exceptions for the LLM Gateway.
 from __future__ import annotations
 
 import logging
+import sys
 from dataclasses import dataclass, field
-from enum import StrEnum
+from enum import Enum
 
 logger = logging.getLogger(__name__)
+
+# StrEnum was introduced in Python 3.11; provide a backport for 3.9/3.10
+if sys.version_info >= (3, 11):
+    from enum import StrEnum
+else:
+    class StrEnum(str, Enum):  # type: ignore[no-redef]
+        pass
 
 
 class Platform(StrEnum):

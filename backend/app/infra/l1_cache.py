@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 name: l1_cache.py
 description: Lightweight, thread-safe in-memory cache helper (L1 cache) with TTL expiration.

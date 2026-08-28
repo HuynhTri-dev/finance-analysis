@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 name: cloudflare_r2.py
 description: Cloudflare R2 session factory and client connection management using aioboto3.

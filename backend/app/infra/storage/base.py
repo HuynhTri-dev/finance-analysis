@@ -4,6 +4,8 @@ description: Abstract interface definition for cloud storage providers
              (S3, Cloudflare R2, Azure, etc.).
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 
 
