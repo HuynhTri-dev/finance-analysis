@@ -5,11 +5,13 @@ For nhà đầu tư cá nhân, who mất nhiều thời gian tổng hợp số l
 
 ## 2. In-Scope
 List the modules, features, and functions that will be built in this project:
-- [x] **Data Ingestion:** Tích hợp `vnstock` để lấy dữ liệu chứng khoán.
-- [x] **News Crawler:** Xây dựng script crawl tin tức theo lịch (Sáng, Trưa, Tối) từ các nguồn uy tín, sử dụng RSS hoặc BeautifulSoup.
-- [x] **AI Agent Core:** Prompt engineering để Agent tổng hợp tin tức + PTKT, phân tích đánh giá tỷ lệ tăng/giảm, KHÔNG đưa ra khuyến nghị Mua/Bán.
-- [x] **Dashboard UI:** Xây dựng giao diện Web 1 trang (Single Page Application). 
-- [x] **Layout UI:** Bố cục 3 phần rõ ràng: Bên trái (Navbar), Ở giữa (Dashboard Chart hoặc PDF Viewer), Bên phải (AI Agent Chat/Panel).
+- [x] **Data Ingestion:** Tích hợp `vnstock` để lấy: chỉ số VNINDEX, HNXINDEX, UPINDEX; Top 10 cổ phiếu tăng giá; Top 10 thanh khoản/mua/bán.
+- [x] **News Crawler (Targeted):** Lọc tin tức theo 2 nhóm: (1) Tin vĩ mô & tin mới nhất thị trường chung, (2) Tin tức chi tiết bám sát "Giỏ cổ phiếu quan tâm" (Watchlist).
+- [x] **AI Agent Core:** Tạo 2 loại báo cáo tổng hợp: 
+  1. Báo cáo Tổng quan (Vĩ mô, tin mới, giao dịch nổi bật).
+  2. Báo cáo Chi tiết theo Danh mục (Watchlist) kết hợp PTKT và Tin tức, phân tích tỷ lệ tăng/giảm trung lập.
+- [x] **Dashboard UI:** Center View mặc định hiển thị Tổng quan thị trường (3 chỉ số chính, 2 bảng Top 10) thay vì một biểu đồ đơn điệu.
+- [x] **Layout UI:** Bố cục 3 phần rõ ràng: Bên trái (Navbar & Watchlist), Ở giữa (Dashboard Overview/Chart/PDF), Bên phải (AI Agent Chat/Panel).
 
 ## 3. Out-of-Scope
 Explicitly list what will NOT be built in this phase (to prevent future disputes):

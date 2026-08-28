@@ -26,9 +26,9 @@ Hiện tại, việc tổng hợp thông tin để phân tích xu hướng của
 
 ## 6. High-Level Scope
 Hệ thống là một ứng dụng Web (Single Page) cá nhân nội bộ, bao gồm:
-- Module Data Ingestion (vnstock cho giá chứng khoán, Crawler/RSS cho tin tức theo lịch).
-- Module AI Agent để phân tích tin tức và PTKT, đưa ra xác suất xu hướng (không đưa ra khuyến nghị mua bán).
-- Giao diện người dùng gồm Sidebar (Navbar) bên trái, AI Agent bên phải, và Dashboard/PDF Viewer ở trung tâm.
+- Module Data Ingestion (vnstock lấy 3 chỉ số chính VNINDEX/HNX/UPCOM, Top 10 biến động/thanh khoản; Crawler lấy tin vĩ mô và tin cho giỏ quan tâm - Watchlist).
+- Module AI Agent sinh 2 loại báo cáo: (1) Tổng quan thị trường, (2) Chi tiết theo Watchlist đánh giá xác suất xu hướng (không khuyến nghị mua bán).
+- Giao diện người dùng gồm Sidebar (Navbar & Watchlist) bên trái, AI Agent bên phải, và Dashboard Tổng quan (Indexes, Top 10) / PDF Viewer ở trung tâm.
 
 ## 7. Constraints & Assumptions
 - **Constraints:** Dự án chạy nội bộ, ưu tiên tính năng nhanh gọn. Crawler chỉ chạy theo schedule (sáng, trưa, tối) không chạy Real-time để tránh bị chặn IP và tiết kiệm tài nguyên. AI phải bị cấm đưa ra lời khuyên Mua/Bán rõ ràng.
