@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.infra.database import async_session_maker
-from app.routers import analyze_router, market_router, news_router, watchlist_router
+from app.routers import analyze_router, market_router, news_router, watchlist_router, report_router
 from app.services import news_service
 
 # ---------------------------------------------------------------------------
@@ -40,11 +40,25 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://your-domain.com"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+        "https://your-domain.com",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+
+static_dir = Path(__file__).resolve().parent.parent / "static"
+static_dir.mkdir(parents=True, exist_ok=True)
+(static_dir / "reports").mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 # ---------------------------------------------------------------------------
 # Routers
@@ -53,6 +67,7 @@ app.include_router(market_router.router)
 app.include_router(news_router.router)
 app.include_router(analyze_router.router)
 app.include_router(watchlist_router.router)
+app.include_router(report_router.router)
 
 
 # ---------------------------------------------------------------------------

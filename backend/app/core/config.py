@@ -83,8 +83,13 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Model
     # ------------------------------------------------------------------
-    _env_file_path = Path(__file__).parent.parent.parent / ".env"
-    model_config = SettingsConfigDict(env_file=_env_file_path, extra="ignore")
+    _backend_env = Path(__file__).resolve().parents[2] / ".env"
+    _root_env = Path(__file__).resolve().parents[3] / ".env"
+    model_config = SettingsConfigDict(
+        env_file=[_root_env, _backend_env, ".env"],
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
 
 @lru_cache

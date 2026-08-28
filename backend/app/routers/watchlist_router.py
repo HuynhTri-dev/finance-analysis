@@ -37,16 +37,16 @@ async def list_watchlist(db: AsyncSession = Depends(get_db)):
 
 @router.post("/", summary="Add a symbol to the watchlist")
 async def add_to_watchlist(request: WatchlistAddRequest, db: AsyncSession = Depends(get_db)):
-    symbol = request.symbol.upper()
-    existing = await db.execute(select(Watchlist).where(Watchlist.symbol == symbol))
-    item = existing.scalar_one_or_none()
-
-    if item:
-        item.is_active = True
-        await db.commit()
-        return {"message": f"{symbol} already exists, set to active.", "symbol": symbol}
-
-    db.add(Watchlist(symbol=symbol))
+    symbol = request.symbol.strip().upper()
+    from sqlalchemy.dialects.postgresql import insert
+    
+    stmt = insert(Watchlist).values(symbol=symbol, is_active=True)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=['symbol'],
+        set_=dict(is_active=True)
+    )
+    
+    await db.execute(stmt)
     await db.commit()
     return {"message": f"{symbol} added to watchlist.", "symbol": symbol}
 

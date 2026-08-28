@@ -67,26 +67,38 @@ async def _upload_report_to_r2(content: str, filename: str) -> str | None:
         Public URL string or None.
     """
     try:
-        import io
-        # Use weasyprint for markdown→HTML→PDF conversion
-        # Falls back to raw markdown bytes if weasyprint not available
+        from fpdf import FPDF
+        
+        # Simple PDF generation using fpdf2
+        class PDF(FPDF):
+            pass
+            
+        pdf = PDF()
+        pdf.add_page()
+        # Add unicode font
         try:
-            import markdown as md_lib
-            from weasyprint import HTML
-            html_content = f"<html><body>{md_lib.markdown(content)}</body></html>"
-            pdf_bytes = HTML(string=html_content).write_pdf()
-        except ImportError:
-            # Fallback: store as plain text/markdown
-            pdf_bytes = content.encode("utf-8")
-            filename = filename.replace(".pdf", ".md")
-
-        r2_client = get_r2_client()
-        provider = S3StorageProvider(client=r2_client)
-        url = await provider.upload(
-            file_bytes=pdf_bytes,
-            filename=f"reports/{filename}",
+            pdf.add_font("Roboto", "", "app/Roboto-Regular.ttf", uni=True)
+            pdf.set_font("Roboto", size=11)
+        except Exception:
+            pdf.set_font("Helvetica", size=11)
+            # Remove non-ascii if fallback font is used
+            content = content.encode("ascii", "ignore").decode("ascii")
+            
+        # Write markdown content (fpdf2 supports basic html, but we'll use multi_cell for raw text for safety)
+        pdf.multi_cell(0, 6, txt=content)
+        pdf_bytes = pdf.output(dest='S')
+        
+        # Upload to R2
+        provider = S3StorageProvider()
+        object_name = f"reports/{filename}"
+        await provider.upload_file(
+            file_data=pdf_bytes,
+            object_name=object_name,
             content_type="application/pdf",
         )
+        
+        # Generate presigned URL (valid for 7 days)
+        url = await provider.get_file_url(object_name, expires_in=604800)
         return url
     except Exception as e:
         logger.warning("Failed to upload report to R2: %s", e)
