@@ -14,7 +14,9 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import requests
-import vnstock as vn
+from vnstock.api.quote import Quote
+from vnstock.api.trading import Trading
+
 
 logger = logging.getLogger(__name__)
 
@@ -272,53 +274,23 @@ def _compute_technical_indicators(df: pd.DataFrame) -> dict[str, Any]:
 
 def _fetch_historical_ohlcv(symbol: str, start_date: str, end_date: str, interval: str = "1D") -> pd.DataFrame | None:
     """
-    Safely retrieve historical OHLCV data using vnstock 4.x/3.x Quote API,
-    with fallbacks across multiple sources (VCI, TCBS) and legacy methods.
+    Safely retrieve historical OHLCV data using vnstock 4.x Quote API,
+    with fallbacks across multiple data sources (VCI, TCBS).
     """
     sym = symbol.upper().strip()
 
-    # 1. Try vnstock 4.x / 3.x Quote API
+    # Try vnstock 4.x Quote API with VCI and TCBS sources
     for source in ["VCI", "TCBS"]:
         try:
-            from vnstock.api.quote import Quote
             q = Quote(symbol=sym, source=source)
             df = q.history(start=start_date, end=end_date, interval=interval)
             if df is not None and not df.empty:
                 return df
         except Exception:
-            pass
-
-        try:
-            from vnstock import Quote
-            q = Quote(symbol=sym, source=source)
-            df = q.history(start=start_date, end=end_date, interval=interval)
-            if df is not None and not df.empty:
-                return df
-        except Exception:
-            pass
-
-    # 2. Try Vnstock().stock() interface
-    try:
-        from vnstock import Vnstock
-        stock = Vnstock().stock(symbol=sym, source="VCI")
-        df = stock.quote.history(start=start_date, end=end_date, interval=interval)
-        if df is not None and not df.empty:
-            return df
-    except Exception:
-        pass
-
-    # 3. Try legacy stock_historical_data if available
-    try:
-        if hasattr(vn, "stock_historical_data"):
-            df = vn.stock_historical_data(
-                symbol=sym, start_date=start_date, end_date=end_date, resolution=interval
-            )
-            if df is not None and not df.empty:
-                return df
-    except Exception:
-        pass
+            continue
 
     return None
+
 
 
 def _fetch_index_data(symbol: str) -> dict[str, Any]:
