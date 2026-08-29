@@ -108,6 +108,8 @@ async def on_shutdown() -> None:
 # ---------------------------------------------------------------------------
 # Health check
 # ---------------------------------------------------------------------------
-@app.get("/", tags=["Health"])
+@app.get("/api", tags=["Health"])
+@app.get("/api/health", tags=["Health"])
 async def root():
     return {"status": "ok", "service": "Finance Analysis API v1.0.0"}
+
