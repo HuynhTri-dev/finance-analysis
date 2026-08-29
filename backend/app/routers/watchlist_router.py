@@ -7,38 +7,42 @@ description: FastAPI router for managing the user's watchlist (add/remove symbol
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from sqlalchemy import delete, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infra.database import async_session_maker
 from app.models import Watchlist
+from app.schemas import (
+    WatchlistActionResponse,
+    WatchlistAddRequest,
+    WatchlistListResponse,
+)
 
 router = APIRouter(prefix="/api/watchlist", tags=["Watchlist"])
 
 
 async def get_db() -> AsyncSession:
+    """Dependency: yields an async database session."""
     async with async_session_maker() as session:
         yield session
 
 
-class WatchlistAddRequest(BaseModel):
-    symbol: str
-
-
-@router.get("/", summary="List all active watchlist symbols")
+@router.get("/", response_model=WatchlistListResponse, summary="List all active watchlist symbols")
 async def list_watchlist(db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Watchlist).where(Watchlist.is_active == True).order_by(Watchlist.added_at.desc())
     )
     items = result.scalars().all()
-    return {"total": len(items), "symbols": [{"symbol": i.symbol, "added_at": i.added_at.isoformat()} for i in items]}
+    return {
+        "total": len(items),
+        "symbols": [{"symbol": i.symbol, "added_at": i.added_at.isoformat()} for i in items],
+    }
 
 
-@router.post("/", summary="Add a symbol to the watchlist")
+@router.post("/", response_model=WatchlistActionResponse, summary="Add a symbol to the watchlist")
 async def add_to_watchlist(request: WatchlistAddRequest, db: AsyncSession = Depends(get_db)):
     symbol = request.symbol.strip().upper()
-    from sqlalchemy.dialects.postgresql import insert
     
     stmt = insert(Watchlist).values(symbol=symbol, is_active=True)
     stmt = stmt.on_conflict_do_update(
@@ -51,7 +55,7 @@ async def add_to_watchlist(request: WatchlistAddRequest, db: AsyncSession = Depe
     return {"message": f"{symbol} added to watchlist.", "symbol": symbol}
 
 
-@router.delete("/{symbol}", summary="Remove a symbol from the watchlist")
+@router.delete("/{symbol}", response_model=WatchlistActionResponse, summary="Remove a symbol from the watchlist")
 async def remove_from_watchlist(symbol: str, db: AsyncSession = Depends(get_db)):
     symbol = symbol.upper()
     result = await db.execute(select(Watchlist).where(Watchlist.symbol == symbol))

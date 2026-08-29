@@ -8,15 +8,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { 
-  Search, 
-  Bot, 
-  FileText, 
-  TrendingUp, 
-  TrendingDown, 
-  RefreshCw, 
-  X, 
-  ExternalLink, 
+import {
+  Search,
+  Bot,
+  FileText,
+  TrendingUp,
+  TrendingDown,
+  RefreshCw,
+  X,
+  ExternalLink,
   ArrowLeft,
   Activity,
   Layers,
@@ -29,17 +29,17 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Sparkles,
-  Menu
+  Menu,
 } from "lucide-react";
 import { marketApi, watchlistApi, analyzeApi, newsApi, reportApi } from "@/lib/api";
-import { 
-  ComposedChart, 
-  Line, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  ComposedChart,
+  Line,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   ReferenceLine
 } from "recharts";
@@ -116,11 +116,11 @@ export default function Home() {
         watchlistApi.getWatchlist()
       ]);
       setOverview(overviewData);
-      
+
       const symbolsRaw = watchlistData.symbols || watchlistData || [];
       const symbolsClean = symbolsRaw.map((item: any) => typeof item === 'string' ? item : item.symbol);
       setWatchlist(symbolsRaw);
-      
+
       if (symbolsClean.length > 0) {
         fetchWatchlistQuotes(symbolsClean);
       }
@@ -168,6 +168,18 @@ export default function Home() {
     if (typeof window !== "undefined" && window.innerWidth < 768) {
       setIsLeftSidebarOpen(false);
     }
+
+    // Keyboard shortcut: Command + Shift + P (or Ctrl + Shift + P) to toggle AI / PDF tab
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "p" || e.key === "P")) {
+        e.preventDefault();
+        setIsRightSidebarOpen(true);
+        setSidebarTab((prev) => (prev === "chat" ? "pdf" : "chat"));
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   const handleSelectSymbol = (symbol: string) => {
@@ -220,7 +232,7 @@ export default function Home() {
     setSidebarTab("chat");
     setIsAnalyzing(true);
     setAgentLogs([{ type: "system", content: "Đang tiến hành phân tích dữ liệu chuyên sâu..." }]);
-    
+
     try {
       let res;
       if (activeSymbol) {
@@ -228,14 +240,14 @@ export default function Home() {
       } else {
         res = await analyzeApi.analyzeOverview();
       }
-      
+
       setAgentLogs(prev => [
         ...prev,
         { type: "markdown", content: res.data?.markdown_content || "Không có nội dung phân tích." }
       ]);
-      
+
       if (res.data?.pdf_url) {
-         setAgentLogs(prev => [
+        setAgentLogs(prev => [
           ...prev,
           { type: "pdf", content: res.data.pdf_url }
         ]);
@@ -295,25 +307,24 @@ export default function Home() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#0D1117] text-gray-200 relative">
-      
+
       {/* Mobile Overlay Backdrop for Left Sidebar */}
       {isLeftSidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/60 z-20 md:hidden backdrop-blur-sm transition-opacity"
           onClick={() => setIsLeftSidebarOpen(false)}
         />
       )}
 
       {/* 1. Left Sidebar: Watchlist & Search (Collapsible) */}
-      <aside 
-        className={`${
-          isLeftSidebarOpen ? "w-72 lg:w-80 translate-x-0" : "w-0 -translate-x-full md:translate-x-0 md:w-0 border-r-0"
-        } bg-[#161B22] border-r border-[#30363D] flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out overflow-hidden z-30 md:static fixed inset-y-0 left-0 shadow-2xl md:shadow-none`}
+      <aside
+        className={`${isLeftSidebarOpen ? "w-72 lg:w-80 translate-x-0" : "w-0 -translate-x-full md:translate-x-0 md:w-0 border-r-0"
+          } bg-[#161B22] border-r border-[#30363D] flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out overflow-hidden z-30 md:static fixed inset-y-0 left-0 shadow-2xl md:shadow-none`}
       >
         <div className="w-72 lg:w-80 flex flex-col h-full">
           {/* Header Brand + Collapse Button */}
           <div className="p-4 border-b border-[#30363D] flex items-center justify-between bg-[#161B22]">
-            <div 
+            <div
               className="flex items-center space-x-3 cursor-pointer hover:opacity-80 transition-opacity"
               onClick={() => setActiveSymbol(null)}
             >
@@ -326,7 +337,7 @@ export default function Home() {
               </div>
             </div>
 
-            <button 
+            <button
               onClick={() => setIsLeftSidebarOpen(false)}
               className="p-1.5 text-gray-400 hover:text-gray-200 hover:bg-[#21262D] rounded-lg transition-colors"
               title="Thu gọn danh mục (Collapse)"
@@ -339,8 +350,8 @@ export default function Home() {
           <div className="p-3">
             <div className="relative">
               <Search className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
-              <input 
-                type="text" 
+              <input
+                type="text"
                 placeholder="Nhập mã (VD: FPT, VNM, HPG) & Enter..."
                 value={searchSymbol}
                 onChange={(e) => setSearchSymbol(e.target.value)}
@@ -354,7 +365,7 @@ export default function Home() {
           <div className="flex-1 overflow-y-auto px-3 py-2">
             <div className="flex justify-between items-center px-1 pb-2 text-[11px] font-semibold text-gray-400 tracking-wider">
               <span>DANH MỤC THEO DÕI</span>
-              <button 
+              <button
                 onClick={() => fetchInitialData(false)}
                 className="hover:text-gray-200 transition-colors p-1 rounded hover:bg-[#21262D]"
                 title="Làm mới giá"
@@ -374,14 +385,13 @@ export default function Home() {
                 const isDown = (changePct || 0) < 0;
 
                 return (
-                  <div 
-                    key={sym} 
+                  <div
+                    key={sym}
                     onClick={() => handleSelectSymbol(sym)}
-                    className={`group relative flex justify-between items-center p-2.5 rounded-lg cursor-pointer transition-all border ${
-                      isSelected 
-                        ? "bg-[#21262D] border-blue-500/60 shadow-sm" 
-                        : "bg-[#161B22] border-transparent hover:bg-[#1F242C] hover:border-[#30363D]"
-                    }`}
+                    className={`group relative flex justify-between items-center p-2.5 rounded-lg cursor-pointer transition-all border ${isSelected
+                      ? "bg-[#21262D] border-blue-500/60 shadow-sm"
+                      : "bg-[#161B22] border-transparent hover:bg-[#1F242C] hover:border-[#30363D]"
+                      }`}
                   >
                     <div className="flex flex-col min-w-0 pr-2">
                       <span className="font-bold text-sm text-gray-100">{sym}</span>
@@ -402,7 +412,7 @@ export default function Home() {
                         )}
                       </div>
 
-                      <button 
+                      <button
                         onClick={(e) => handleRemoveWatchlist(e, sym)}
                         className="opacity-0 group-hover:opacity-100 p-1 text-gray-500 hover:text-rose-400 hover:bg-[#30363D] rounded transition-all"
                         title="Xóa khỏi danh sách"
@@ -429,7 +439,7 @@ export default function Home() {
 
       {/* 2. Main Dashboard Panel (Flex-1, Fluid & Auto-Expanding) */}
       <main className="flex-1 flex flex-col overflow-hidden bg-[#0D1117] min-w-0 transition-all duration-300">
-        
+
         {/* Top Header Bar */}
         <header className="h-14 border-b border-[#30363D] flex items-center justify-between px-4 sm:px-6 bg-[#161B22]/80 backdrop-blur z-10">
           <div className="flex items-center space-x-3 min-w-0">
@@ -446,9 +456,8 @@ export default function Home() {
             )}
 
             <div className="flex items-center space-x-2 truncate">
-              <span className="text-xs text-gray-400 hidden sm:inline">Trạng thái:</span>
               <span className="text-xs sm:text-sm font-semibold text-gray-200 truncate">
-                {activeSymbol ? `Dashboard Cổ Phiếu: ${activeSymbol}` : "Tổng Quan Thị Trường Việt Nam"}
+                {activeSymbol ? `Dashboard: ${activeSymbol}` : "Tổng Quan Thị Trường Việt Nam"}
               </span>
             </div>
           </div>
@@ -462,11 +471,10 @@ export default function Home() {
             {/* Toggle Right AI / PDF Panel Button */}
             <button
               onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-2 border transition-all ${
-                isRightSidebarOpen
-                  ? "bg-blue-600/15 text-blue-400 border-blue-500/40 shadow-sm"
-                  : "bg-[#21262D] text-gray-300 border-[#30363D] hover:bg-[#30363D] hover:text-white"
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-2 border transition-all ${isRightSidebarOpen
+                ? "bg-blue-600/15 text-blue-400 border-blue-500/40 shadow-sm"
+                : "bg-[#21262D] text-gray-300 border-[#30363D] hover:bg-[#30363D] hover:text-white"
+                }`}
               title={isRightSidebarOpen ? "Thu gọn thanh AI & Báo Cáo" : "Mở Trợ lý AI & Báo Cáo"}
             >
               <Bot size={15} className={isAnalyzing ? "text-emerald-400 animate-spin" : "text-blue-400"} />
@@ -499,9 +507,8 @@ export default function Home() {
                     <div key={idx.symbol} className="p-4 rounded-xl bg-[#161B22] border border-[#30363D] shadow-sm hover:border-gray-600 transition-all">
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-sm font-bold text-gray-200">{idx.symbol}</span>
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-md border ${
-                          isPositive ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                        }`}>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-md border ${isPositive ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                          }`}>
                           {idx.change_pct !== null ? `${isPositive ? '+' : ''}${idx.change_pct}%` : 'N/A'}
                         </span>
                       </div>
@@ -527,8 +534,8 @@ export default function Home() {
                     Đánh giá toàn cảnh thị trường chứng khoán, dòng tiền khối ngoại và khuyến nghị tổng quan.
                   </p>
                 </div>
-                <button 
-                  onClick={handleAnalyze} 
+                <button
+                  onClick={handleAnalyze}
                   disabled={isAnalyzing}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-lg shadow-blue-500/30 transition-all flex items-center space-x-2 disabled:opacity-50 flex-shrink-0"
                 >
@@ -546,9 +553,9 @@ export default function Home() {
                   </h3>
                   <div className="divide-y divide-[#30363D]/60">
                     {overview.top_gainers?.slice(0, 6).map((stock: any) => (
-                      <div 
-                        key={stock.symbol} 
-                        onClick={() => handleSelectSymbol(stock.symbol)} 
+                      <div
+                        key={stock.symbol}
+                        onClick={() => handleSelectSymbol(stock.symbol)}
                         className="py-2.5 flex justify-between items-center cursor-pointer hover:bg-[#21262D] px-2 rounded-lg transition-colors"
                       >
                         <span className="font-bold text-xs text-gray-200">{stock.symbol}</span>
@@ -568,9 +575,9 @@ export default function Home() {
                   </h3>
                   <div className="divide-y divide-[#30363D]/60">
                     {overview.top_volume?.slice(0, 6).map((stock: any) => (
-                      <div 
-                        key={stock.symbol} 
-                        onClick={() => handleSelectSymbol(stock.symbol)} 
+                      <div
+                        key={stock.symbol}
+                        onClick={() => handleSelectSymbol(stock.symbol)}
                         className="py-2.5 flex justify-between items-center cursor-pointer hover:bg-[#21262D] px-2 rounded-lg transition-colors"
                       >
                         <span className="font-bold text-xs text-gray-200">{stock.symbol}</span>
@@ -589,7 +596,7 @@ export default function Home() {
           {/* VIEW 2: INDIVIDUAL STOCK DASHBOARD (Fluid Grid) */}
           {activeSymbol && (
             <div className="space-y-5 max-w-[1600px] mx-auto min-w-0">
-              
+
               {/* 1. Top Header Row with Hero Price & Action Buttons */}
               <div className="flex flex-wrap items-center justify-between gap-4 bg-[#161B22] border border-[#30363D] p-4 sm:p-5 rounded-xl shadow-sm">
                 <div className="flex items-center space-x-3 sm:space-x-4 min-w-0">
@@ -623,7 +630,7 @@ export default function Home() {
 
                   {/* Actions */}
                   <div className="flex items-center space-x-2 sm:space-x-2.5">
-                    <button 
+                    <button
                       onClick={handleGenerateQuickReport}
                       disabled={isAnalyzing}
                       className="px-3 sm:px-3.5 py-2 bg-[#21262D] hover:bg-[#30363D] text-gray-200 text-xs font-semibold rounded-lg border border-[#30363D] transition-colors flex items-center space-x-1.5 disabled:opacity-50"
@@ -631,9 +638,9 @@ export default function Home() {
                       <FileText size={14} className="text-blue-400" />
                       <span>Tải PDF Nhanh</span>
                     </button>
-                    
-                    <button 
-                      onClick={handleAnalyze} 
+
+                    <button
+                      onClick={handleAnalyze}
                       disabled={isAnalyzing}
                       className="px-3 sm:px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-md shadow-blue-500/20 transition-all flex items-center space-x-1.5 disabled:opacity-50"
                     >
@@ -691,11 +698,10 @@ export default function Home() {
                       <span>Biểu Đồ Kỹ Thuật (OHLCV & Moving Averages)</span>
                     </div>
 
-                    <button 
+                    <button
                       onClick={() => setShowMAs(!showMAs)}
-                      className={`text-[11px] px-2 py-0.5 rounded border transition-colors ${
-                        showMAs ? "bg-blue-500/20 text-blue-400 border-blue-500/40" : "bg-[#21262D] text-gray-400 border-[#30363D]"
-                      }`}
+                      className={`text-[11px] px-2 py-0.5 rounded border transition-colors ${showMAs ? "bg-blue-500/20 text-blue-400 border-blue-500/40" : "bg-[#21262D] text-gray-400 border-[#30363D]"
+                        }`}
                     >
                       MA20 / MA50
                     </button>
@@ -707,11 +713,10 @@ export default function Home() {
                       <button
                         key={tf}
                         onClick={() => handleTimeframeChange(tf)}
-                        className={`px-2.5 sm:px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                          selectedTimeframe === tf 
-                            ? "bg-blue-600 text-white shadow" 
-                            : "text-gray-400 hover:text-gray-200 hover:bg-[#21262D]"
-                        }`}
+                        className={`px-2.5 sm:px-3 py-1 text-xs font-semibold rounded-md transition-all ${selectedTimeframe === tf
+                          ? "bg-blue-600 text-white shadow"
+                          : "text-gray-400 hover:text-gray-200 hover:bg-[#21262D]"
+                          }`}
                       >
                         {tf}
                       </button>
@@ -730,8 +735,8 @@ export default function Home() {
                     <ResponsiveContainer width="100%" height="100%">
                       <ComposedChart data={chartRecords} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#21262D" vertical={false} />
-                        <XAxis 
-                          dataKey="time" 
+                        <XAxis
+                          dataKey="time"
                           tickFormatter={(timeStr) => {
                             try { return format(new Date(timeStr), "dd/MM"); } catch { return timeStr; }
                           }}
@@ -739,16 +744,16 @@ export default function Home() {
                           tick={{ fontSize: 11 }}
                           minTickGap={25}
                         />
-                        <YAxis 
-                          yAxisId="price" 
-                          domain={['auto', 'auto']} 
-                          stroke="#6E7681" 
+                        <YAxis
+                          yAxisId="price"
+                          domain={['auto', 'auto']}
+                          stroke="#6E7681"
                           tick={{ fontSize: 11 }}
                           tickFormatter={(val) => (val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val)}
                         />
                         <YAxis yAxisId="vol" orientation="right" domain={[0, 'dataMax * 3']} hide />
-                        
-                        <Tooltip 
+
+                        <Tooltip
                           content={({ active, payload, label }) => {
                             if (active && payload && payload.length) {
                               const d = payload[0].payload;
@@ -800,14 +805,14 @@ export default function Home() {
                         )}
 
                         {/* Price Line */}
-                        <Line 
-                          yAxisId="price" 
-                          type="monotone" 
-                          dataKey="close" 
-                          stroke="#38BDF8" 
-                          dot={false} 
-                          strokeWidth={2.5} 
-                          name="Giá đóng cửa" 
+                        <Line
+                          yAxisId="price"
+                          type="monotone"
+                          dataKey="close"
+                          stroke="#38BDF8"
+                          dot={false}
+                          strokeWidth={2.5}
+                          name="Giá đóng cửa"
                         />
                       </ComposedChart>
                     </ResponsiveContainer>
@@ -822,7 +827,7 @@ export default function Home() {
 
               {/* 4. Four Analytics Cards Grid (Responsive: 1 / 2 / 4 columns) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4 gap-4">
-                
+
                 {/* Card 1: Sổ lệnh 3 mức giá (Order Book) */}
                 <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-4 flex flex-col justify-between min-w-0 shadow-sm">
                   <div>
@@ -894,9 +899,8 @@ export default function Home() {
                       </div>
                       <div className="flex justify-between items-center pt-1 border-t border-[#30363D]">
                         <span className="text-gray-300 font-semibold">Mua/Bán Ròng:</span>
-                        <span className={`font-bold ${
-                          (foreignFlow.net_val || 0) >= 0 ? "text-emerald-400" : "text-rose-400"
-                        }`}>
+                        <span className={`font-bold ${(foreignFlow.net_val || 0) >= 0 ? "text-emerald-400" : "text-rose-400"
+                          }`}>
                           {(foreignFlow.net_val || 0) >= 0 ? "+" : ""}
                           {foreignFlow.net_val ? `${(foreignFlow.net_val / 1_000_000_000).toFixed(2)} Tỷ` : "--"}
                         </span>
@@ -935,7 +939,7 @@ export default function Home() {
                           {orderFlow.active_sell_vol ? orderFlow.active_sell_vol.toLocaleString() : "--"}
                         </span>
                       </div>
-                      
+
                       {/* Pressure Bar */}
                       <div className="pt-1">
                         <div className="flex justify-between text-[10px] text-gray-400 mb-1">
@@ -943,8 +947,8 @@ export default function Home() {
                           <span>Bán: {100 - (orderFlow.buy_pressure_pct || 50)}%</span>
                         </div>
                         <div className="w-full h-2 rounded-full bg-rose-500/40 overflow-hidden flex">
-                          <div 
-                            className="bg-emerald-500 h-full transition-all duration-500" 
+                          <div
+                            className="bg-emerald-500 h-full transition-all duration-500"
                             style={{ width: `${orderFlow.buy_pressure_pct || 50}%` }}
                           ></div>
                         </div>
@@ -967,9 +971,8 @@ export default function Home() {
                     <div className="mt-3 space-y-2 text-xs">
                       <div className="flex justify-between items-center">
                         <span className="text-gray-400">RSI (14):</span>
-                        <span className={`font-bold ${
-                          (technicals.rsi_14 || 50) > 70 ? "text-rose-400" : (technicals.rsi_14 || 50) < 30 ? "text-emerald-400" : "text-amber-400"
-                        }`}>
+                        <span className={`font-bold ${(technicals.rsi_14 || 50) > 70 ? "text-rose-400" : (technicals.rsi_14 || 50) < 30 ? "text-emerald-400" : "text-amber-400"
+                          }`}>
                           {technicals.rsi_14 !== null ? technicals.rsi_14 : "--"}
                         </span>
                       </div>
@@ -1007,11 +1010,11 @@ export default function Home() {
                 <div className="divide-y divide-[#30363D]/60">
                   {news && news.length > 0 ? (
                     news.slice(0, 8).map((n: any) => (
-                      <a 
-                        key={n.id || n.url} 
-                        href={n.url || n.link} 
-                        target="_blank" 
-                        rel="noreferrer" 
+                      <a
+                        key={n.id || n.url}
+                        href={n.url || n.link}
+                        target="_blank"
+                        rel="noreferrer"
                         className="block p-4 hover:bg-[#21262D] transition-colors"
                       >
                         <h4 className="text-xs font-semibold text-blue-400 mb-1 leading-snug hover:underline">
@@ -1042,17 +1045,16 @@ export default function Home() {
 
       {/* Mobile Overlay Backdrop for Right Sidebar */}
       {isRightSidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/60 z-20 xl:hidden backdrop-blur-sm transition-opacity"
           onClick={() => setIsRightSidebarOpen(false)}
         />
       )}
 
       {/* 3. Right Sidebar: AI Assistant & PDF Report Tabs (Collapsible) */}
-      <aside 
-        className={`${
-          isRightSidebarOpen ? "w-full sm:w-[400px] xl:w-[420px] translate-x-0" : "w-0 translate-x-full xl:translate-x-0 xl:w-0 border-l-0"
-        } bg-[#161B22] border-l border-[#30363D] flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out overflow-hidden z-30 fixed xl:static inset-y-0 right-0 shadow-2xl xl:shadow-none`}
+      <aside
+        className={`${isRightSidebarOpen ? "w-full sm:w-[400px] xl:w-[420px] translate-x-0" : "w-0 translate-x-full xl:translate-x-0 xl:w-0 border-l-0"
+          } bg-[#161B22] border-l border-[#30363D] flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out overflow-hidden z-30 fixed xl:static inset-y-0 right-0 shadow-2xl xl:shadow-none`}
       >
         <div className="w-full sm:w-[400px] xl:w-[420px] flex flex-col h-full">
           {/* Header Controls */}
@@ -1061,29 +1063,43 @@ export default function Home() {
               <div className={`w-2.5 h-2.5 rounded-full ${isAnalyzing ? 'bg-emerald-500 animate-ping' : 'bg-blue-500'}`}></div>
               <h2 className="text-sm font-semibold text-gray-100">Trợ Lý Phân Tích AI</h2>
             </div>
-            
+
             <div className="flex items-center space-x-2">
-              <div className="flex space-x-1 bg-[#0D1117] p-1 rounded-lg border border-[#30363D]">
-                <button 
+              <div className="flex items-center bg-[#0D1117] p-0.5 rounded-lg border border-[#30363D]">
+                <button
                   onClick={() => setSidebarTab("chat")}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                    sidebarTab === "chat" ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-200"
-                  }`}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${sidebarTab === "chat"
+                      ? "bg-[#21262D] text-blue-400 font-semibold shadow-sm border border-[#30363D]"
+                      : "text-gray-400 hover:text-gray-200"
+                    }`}
+                  title="Phân tích AI (⌘ + Shift + P)"
                 >
-                  Phân Tích
+                  <Sparkles size={13} />
+                  <span>AI</span>
                 </button>
-                <button 
+                <button
                   onClick={() => setSidebarTab("pdf")}
-                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                    sidebarTab === "pdf" ? "bg-blue-600 text-white shadow" : "text-gray-400 hover:text-gray-200"
-                  }`}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${sidebarTab === "pdf"
+                      ? "bg-[#21262D] text-blue-400 font-semibold shadow-sm border border-[#30363D]"
+                      : "text-gray-400 hover:text-gray-200"
+                    }`}
+                  title="Báo cáo PDF (⌘ + Shift + P)"
                 >
-                  Báo Cáo PDF ({pdfReports.length})
+                  <FileText size={13} />
+                  <span>PDF</span>
+                  {pdfReports.length > 0 && (
+                    <span
+                      className={`px-1.5 py-0.2 text-[10px] font-bold rounded-full transition-colors ${sidebarTab === "pdf" ? "bg-blue-500/20 text-blue-300" : "bg-[#21262D] text-gray-400"
+                        }`}
+                    >
+                      {pdfReports.length}
+                    </span>
+                  )}
                 </button>
               </div>
 
               {/* Close / Collapse Right Sidebar Button */}
-              <button 
+              <button
                 onClick={() => setIsRightSidebarOpen(false)}
                 className="p-1.5 text-gray-400 hover:text-gray-200 hover:bg-[#21262D] rounded-lg transition-colors"
                 title="Thu gọn Trợ lý AI (Collapse)"
@@ -1107,40 +1123,39 @@ export default function Home() {
                 </div>
               ) : (
                 agentLogs.map((log, i) => (
-                  <div 
-                    key={i} 
-                    className={`p-4 rounded-xl border text-xs leading-relaxed ${
-                      log.type === 'system' 
-                        ? 'bg-[#0D1117] border-[#30363D] text-gray-400' 
-                        : log.type === 'error' 
-                        ? 'bg-rose-950/20 border-rose-900/50 text-rose-300' 
+                  <div
+                    key={i}
+                    className={`p-4 rounded-xl border text-xs leading-relaxed ${log.type === 'system'
+                      ? 'bg-[#0D1117] border-[#30363D] text-gray-400'
+                      : log.type === 'error'
+                        ? 'bg-rose-950/20 border-rose-900/50 text-rose-300'
                         : 'bg-[#1C2128] border-[#30363D] text-gray-200'
-                    }`}
+                      }`}
                   >
                     {log.type === 'markdown' ? (
-                       <div className="whitespace-pre-wrap font-sans text-gray-200 space-y-2">{log.content}</div>
+                      <div className="whitespace-pre-wrap font-sans text-gray-200 space-y-2">{log.content}</div>
                     ) : log.type === 'pdf' ? (
-                       <div className="flex flex-col space-y-2">
-                         <div className="text-xs text-gray-300 font-semibold">Báo cáo PDF đã được khởi tạo thành công:</div>
-                         <div className="flex items-center space-x-2 pt-1">
-                           <button 
-                             onClick={() => { setSelectedPdf(log.content); setSidebarTab("pdf"); }}
-                             className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg flex items-center space-x-1.5 transition-colors shadow"
-                           >
-                             <FileText size={14} />
-                             <span>Xem Trực Tiếp</span>
-                           </button>
-                           <a 
-                             href={log.content} 
-                             target="_blank" 
-                             rel="noreferrer" 
-                             className="px-3 py-1.5 bg-[#21262D] hover:bg-[#30363D] text-gray-300 text-xs font-semibold rounded-lg flex items-center space-x-1.5 transition-colors border border-[#30363D]"
-                           >
-                             <ExternalLink size={14} />
-                             <span>Mở Tab Mới</span>
-                           </a>
-                         </div>
-                       </div>
+                      <div className="flex flex-col space-y-2">
+                        <div className="text-xs text-gray-300 font-semibold">Báo cáo PDF đã được khởi tạo thành công:</div>
+                        <div className="flex items-center space-x-2 pt-1">
+                          <button
+                            onClick={() => { setSelectedPdf(log.content); setSidebarTab("pdf"); }}
+                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg flex items-center space-x-1.5 transition-colors shadow"
+                          >
+                            <FileText size={14} />
+                            <span>Xem Trực Tiếp</span>
+                          </button>
+                          <a
+                            href={log.content}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-3 py-1.5 bg-[#21262D] hover:bg-[#30363D] text-gray-300 text-xs font-semibold rounded-lg flex items-center space-x-1.5 transition-colors border border-[#30363D]"
+                          >
+                            <ExternalLink size={14} />
+                            <span>Mở Tab Mới</span>
+                          </a>
+                        </div>
+                      </div>
                     ) : (
                       <span>{log.content}</span>
                     )}
@@ -1149,12 +1164,12 @@ export default function Home() {
               )}
               {isAnalyzing && (
                 <div className="p-4 rounded-xl bg-[#0D1117] border border-[#30363D] flex items-center space-x-3">
-                   <div className="flex space-x-1">
-                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></div>
-                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
-                   </div>
-                   <span className="text-xs text-gray-400">AI Agent đang đọc dữ liệu tài chính & tổng hợp báo cáo...</span>
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></div>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
+                  </div>
+                  <span className="text-xs text-gray-400">AI Agent đang đọc dữ liệu tài chính & tổng hợp báo cáo...</span>
                 </div>
               )}
             </div>
@@ -1163,17 +1178,17 @@ export default function Home() {
               {selectedPdf ? (
                 <div className="flex-1 flex flex-col h-full bg-[#0D1117]">
                   <div className="p-2 border-b border-[#30363D] bg-[#161B22] flex items-center justify-between">
-                    <button 
-                      onClick={() => setSelectedPdf(null)} 
+                    <button
+                      onClick={() => setSelectedPdf(null)}
                       className="flex items-center space-x-1 text-xs text-gray-300 hover:text-white px-2.5 py-1.5 rounded-md bg-[#21262D] hover:bg-[#30363D] transition-colors"
                     >
                       <ArrowLeft size={14} />
                       <span>Quay lại danh sách</span>
                     </button>
-                    <a 
-                      href={selectedPdf} 
-                      target="_blank" 
-                      rel="noreferrer" 
+                    <a
+                      href={selectedPdf}
+                      target="_blank"
+                      rel="noreferrer"
                       className="flex items-center space-x-1 text-xs text-blue-400 hover:underline px-2 py-1"
                     >
                       <ExternalLink size={14} />
@@ -1188,8 +1203,8 @@ export default function Home() {
                     <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
                       Tất cả báo cáo đã tạo ({pdfReports.length})
                     </div>
-                    <button 
-                      onClick={fetchPdfReports} 
+                    <button
+                      onClick={fetchPdfReports}
                       disabled={loadingPdfs}
                       className="p-1 text-gray-400 hover:text-gray-200 rounded hover:bg-[#21262D] transition-colors"
                       title="Làm mới danh sách"
@@ -1197,7 +1212,7 @@ export default function Home() {
                       <RefreshCw size={14} className={loadingPdfs ? "animate-spin" : ""} />
                     </button>
                   </div>
-                  
+
                   {loadingPdfs && pdfReports.length === 0 ? (
                     <div className="text-center py-12 text-xs text-gray-500">Đang tải danh sách báo cáo...</div>
                   ) : pdfReports.length === 0 ? (
@@ -1207,8 +1222,8 @@ export default function Home() {
                     </div>
                   ) : (
                     pdfReports.map((report, idx) => (
-                      <div 
-                        key={idx} 
+                      <div
+                        key={idx}
                         className="p-3.5 rounded-xl bg-[#0D1117] border border-[#30363D] hover:border-gray-600 transition-all flex flex-col space-y-2.5"
                       >
                         <div className="flex items-start justify-between">
@@ -1230,17 +1245,17 @@ export default function Home() {
                         </div>
 
                         <div className="flex items-center space-x-2 pt-1 border-t border-[#30363D]/60">
-                          <button 
+                          <button
                             onClick={() => setSelectedPdf(report.url)}
                             className="flex-1 py-1.5 bg-[#21262D] hover:bg-[#30363D] text-blue-400 text-xs font-semibold rounded-lg flex items-center justify-center space-x-1.5 transition-colors"
                           >
                             <FileText size={13} />
                             <span>Xem ngay</span>
                           </button>
-                          <a 
-                            href={report.url} 
-                            target="_blank" 
-                            rel="noreferrer" 
+                          <a
+                            href={report.url}
+                            target="_blank"
+                            rel="noreferrer"
                             className="px-2.5 py-1.5 bg-[#21262D] hover:bg-[#30363D] text-gray-300 text-xs rounded-lg flex items-center justify-center transition-colors border border-[#30363D]"
                             title="Mở tab mới"
                           >

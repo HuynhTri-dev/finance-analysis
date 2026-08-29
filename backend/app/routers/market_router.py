@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 
+from app.schemas import BatchQuoteItem
 from app.services import market_service
 
 router = APIRouter(prefix="/api/market", tags=["Market"])
@@ -62,7 +63,7 @@ def get_stock_detail(
         raise HTTPException(status_code=500, detail=f"Failed to fetch stock details for {symbol}: {e}")
 
 
-@router.get("/quotes", summary="Batch Quotes for Watchlist")
+@router.get("/quotes", response_model=list[BatchQuoteItem], summary="Batch Quotes for Watchlist")
 def get_batch_quotes(
     symbols: str = Query(..., description="Comma-separated stock symbols (e.g. FPT,VNM,CMG)"),
 ):

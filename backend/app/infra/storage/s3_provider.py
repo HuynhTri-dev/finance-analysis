@@ -6,11 +6,14 @@ description: Physical storage provider implementation using aioboto3
              for S3-compatible systems like Cloudflare R2.
 """
 
+import logging
 from botocore.exceptions import ClientError  # type: ignore[import-untyped]
 
 from app.core.config import Settings, get_settings
 from app.infra.storage.base import IStorageProvider
 from app.infra.storage.cloudflare_r2 import get_r2_client
+
+logger = logging.getLogger(__name__)
 
 
 class S3StorageProvider(IStorageProvider):
@@ -132,3 +135,56 @@ class S3StorageProvider(IStorageProvider):
             async with response["Body"] as stream:
                 data: bytes = await stream.read()
                 return data
+
+    async def list_files(self, prefix: str = "reports/") -> list[dict]:
+        """
+        List objects from S3/R2 storage under a specific prefix.
+
+        Input:
+            prefix (str): Storage key prefix (e.g. 'reports/').
+
+        Output:
+            list[dict]: List of object metadata dictionaries.
+
+        Description & Logic:
+            - Calls list_objects_v2 on the S3/R2 client.
+            - Generates presigned URLs for each found object.
+            - Returns list of objects sorted by last modified date descending.
+        """
+        results: list[dict] = []
+        try:
+            async with get_r2_client(self.settings) as client:
+                response = await client.list_objects_v2(
+                    Bucket=self.bucket_name,
+                    Prefix=prefix,
+                )
+                contents = response.get("Contents", [])
+                # Sort newest first
+                sorted_contents = sorted(
+                    contents,
+                    key=lambda x: x.get("LastModified", ""),
+                    reverse=True,
+                )
+                for item in sorted_contents:
+                    key = item.get("Key", "")
+                    if not key or key.endswith("/"):
+                        continue
+                    size_bytes = item.get("Size", 0)
+                    last_modified = item.get("LastModified")
+                    iso_time = last_modified.isoformat() if last_modified else ""
+
+                    url = await client.generate_presigned_url(
+                        ClientMethod="get_object",
+                        Params={"Bucket": self.bucket_name, "Key": key},
+                        ExpiresIn=604800,  # 7 days
+                    )
+                    filename = key.split("/")[-1]
+                    results.append({
+                        "filename": filename,
+                        "url": url,
+                        "size_kb": round(size_bytes / 1024, 1),
+                        "created_at": iso_time,
+                    })
+        except Exception as e:
+            logger.warning("Failed to list files from S3/R2: %s", e)
+        return results

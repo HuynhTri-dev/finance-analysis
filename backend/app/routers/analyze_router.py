@@ -14,31 +14,16 @@ import logging
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infra.database import async_session_maker
 from app.infra.storage import S3StorageProvider, get_r2_client
+from app.schemas import AnalysisResponse, DetailAnalysisRequest
 from app.services import ai_orchestrator_service, market_service, news_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/analyze", tags=["Analysis"])
-
-
-# ---------------------------------------------------------------------------
-# Pydantic schemas for request/response
-# ---------------------------------------------------------------------------
-
-class DetailAnalysisRequest(BaseModel):
-    symbol: str
-
-
-class AnalysisResponse(BaseModel):
-    status: str
-    markdown_content: str
-    pdf_url: Optional[str] = None
-    error: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------

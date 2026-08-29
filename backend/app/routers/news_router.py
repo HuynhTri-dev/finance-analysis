@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infra.database import async_session_maker
+from app.schemas import NewsListResponse, NewsSymbolResponse
 from app.services import news_service
 
 router = APIRouter(prefix="/api/news", tags=["News"])
@@ -21,7 +22,7 @@ async def get_db() -> AsyncSession:
         yield session
 
 
-@router.get("/", summary="Get News Articles by Category")
+@router.get("/", response_model=NewsListResponse, summary="Get News Articles by Category")
 async def get_news(
     type: str = Query(default="macro", pattern="^(macro|watchlist)$"),
     limit: int = Query(default=20, ge=1, le=100),
@@ -40,7 +41,7 @@ async def get_news(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/symbol/{symbol}", summary="Get News for a Specific Symbol")
+@router.get("/symbol/{symbol}", response_model=NewsSymbolResponse, summary="Get News for a Specific Symbol")
 async def get_news_by_symbol(
     symbol: str,
     limit: int = Query(default=10, ge=1, le=50),

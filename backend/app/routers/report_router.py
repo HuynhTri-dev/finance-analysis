@@ -1,16 +1,22 @@
+"""
+name: report_router.py
+description: FastAPI router for generating and listing on-demand stock PDF reports.
+"""
+
 from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
+from fpdf import FPDF
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel
 
 from app.infra.database import async_session_maker
 from app.infra.storage import S3StorageProvider
+from app.schemas import ReportListResponse, ReportResponse
 from app.services import market_service, news_service
-from fpdf import FPDF
 
 logger = logging.getLogger(__name__)
 
@@ -19,10 +25,6 @@ router = APIRouter(prefix="/api/report", tags=["Report"])
 async def get_db() -> AsyncSession:
     async with async_session_maker() as session:
         yield session
-
-class ReportResponse(BaseModel):
-    status: str
-    pdf_url: str
 
 @router.post("/symbol/{symbol}", response_model=ReportResponse, summary="Generate Quick PDF Report")
 async def generate_symbol_report(symbol: str, db: AsyncSession = Depends(get_db)):
@@ -135,13 +137,26 @@ async def generate_symbol_report(symbol: str, db: AsyncSession = Depends(get_db)
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/list", summary="List Generated PDF Reports")
-def list_reports():
-    from pathlib import Path
+@router.get("/list", response_model=ReportListResponse, summary="List Generated PDF Reports")
+async def list_reports():
+    """
+    Retrieve generated PDF reports from Cloudflare R2 storage.
+    Falls back to local static files if R2 is not configured or returns no items.
+    """
+    try:
+        provider = S3StorageProvider()
+        if provider.settings.r2_endpoint_url and provider.settings.bucket_name:
+            r2_reports = await provider.list_files(prefix="reports/")
+            if r2_reports:
+                return {"reports": r2_reports}
+    except Exception as err:
+        logger.warning("Failed to fetch reports from Cloudflare R2, falling back to local: %s", err)
+
+    # Fallback to local static storage
     static_dir = Path(__file__).resolve().parent.parent.parent / "static" / "reports"
     if not static_dir.exists():
         return {"reports": []}
-    
+
     reports = []
     for p in sorted(static_dir.glob("*.pdf"), key=lambda f: f.stat().st_mtime, reverse=True):
         mtime = datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc).isoformat()

@@ -85,3 +85,19 @@ class IStorageProvider(ABC):
             - Fetches and returns raw bytes from the target object key.
         """
         pass
+
+    @abstractmethod
+    async def list_files(self, prefix: str = "") -> list[dict]:
+        """
+        List objects in storage matching a prefix.
+
+        Input:
+            prefix (str): Storage path prefix to filter objects.
+
+        Output:
+            list[dict]: List of object metadata dicts.
+
+        Description & Logic:
+            - Lists objects under the given prefix.
+        """
+        pass
