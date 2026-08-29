@@ -1,0 +1,11 @@
+{
+  "name": "finance-analysis-root",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build"
+  },
+  "dependencies": {
+    "next": "16.3.3"
+  }
+}
