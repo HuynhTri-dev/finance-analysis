@@ -7,12 +7,26 @@ description: FastAPI application entry point for the Finance Analysis backend.
 
 from __future__ import annotations
 
+import os
+import tempfile
+
+# ---------------------------------------------------------------------------
+# Serverless Environment Fix (Vercel / AWS Lambda Read-Only Filesystem)
+# Redirect $HOME and cache dirs to /tmp so vnstock, matplotlib, etc. can write
+# ---------------------------------------------------------------------------
+_tmp_dir = tempfile.gettempdir()
+os.environ.setdefault("HOME", _tmp_dir)
+os.environ.setdefault("MPLCONFIGDIR", _tmp_dir)
+os.environ.setdefault("XDG_CACHE_HOME", os.path.join(_tmp_dir, ".cache"))
+os.environ.setdefault("XDG_CONFIG_HOME", os.path.join(_tmp_dir, ".config"))
+
 import logging
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 
 from app.infra.database import async_session_maker
 from app.routers import analyze_router, market_router, news_router, watchlist_router, report_router

@@ -11,11 +11,19 @@ import time
 from datetime import datetime, timedelta
 from typing import Any
 
+import os
+import tempfile
+
+_tmp = tempfile.gettempdir()
+os.environ.setdefault("HOME", _tmp)
+os.environ.setdefault("MPLCONFIGDIR", _tmp)
+
 import numpy as np
 import pandas as pd
 import requests
 from vnstock.api.quote import Quote
 from vnstock.api.trading import Trading
+
 
 
 logger = logging.getLogger(__name__)
