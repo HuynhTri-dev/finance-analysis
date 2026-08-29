@@ -366,59 +366,84 @@ def _fetch_index_data(symbol: str) -> dict[str, Any]:
 
 def _fetch_top_movers() -> tuple[list[dict], list[dict]]:
     """
-    Fetch top 10 gainers (by % change) and top 10 by volume.
+    Fetch top 10 gainers (by % change) and top 10 by volume across VN30 / HOSE.
 
     Output:
         tuple[list[dict], list[dict]]: Tuple of (top_gainers, top_volume).
-
-    Description & Logic:
-        - Retrieve market top mover dataset via vnstock.
-        - Filter and sort top 10 positive price changes and highest volume tickers.
     """
+    # 1. Primary: Realtime Priceboard from SSI iBoard API (VN30 / HOSE)
     try:
-        df = vn.market_top_mover()
+        url = "https://iboard-query.ssi.com.vn/stock/group/VN30"
+        headers = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
+        resp = requests.get(url, headers=headers, timeout=5)
+        if resp.status_code == 200:
+            data = resp.json().get("data", [])
+            stocks = []
+            for item in data:
+                sym = item.get("stockSymbol")
+                if not sym:
+                    continue
+                price = float(item.get("matchedPrice") or item.get("refPrice") or 0)
+                change_pct = float(item.get("priceChangePercent") or 0)
+                vol = int(item.get("nmTotalTradedQty") or item.get("stockVol") or 0)
+                stocks.append({
+                    "symbol": sym,
+                    "close": price,
+                    "change_pct": change_pct,
+                    "volume": vol,
+                })
 
-        if df is None or df.empty:
-            return [], []
+            if stocks:
+                top_gainers = sorted(
+                    [s for s in stocks if s["change_pct"] > 0],
+                    key=lambda x: x["change_pct"],
+                    reverse=True,
+                )[:10]
+                if not top_gainers:
+                    top_gainers = sorted(stocks, key=lambda x: x["change_pct"], reverse=True)[:10]
 
-        df = df.where(pd.notnull(df), None)
-        df.columns = [c.lower() for c in df.columns]
+                top_volume = sorted(stocks, key=lambda x: x["volume"], reverse=True)[:10]
+                return top_gainers, top_volume
+    except Exception as err:
+        logger.warning("SSI top movers fetch error: %s", err)
 
-        ticker_col = next((c for c in df.columns if c in ("ticker", "symbol", "code")), None)
-        change_col = next((c for c in df.columns if "change" in c and "pct" not in c.lower() and "%" not in c), None)
-        vol_col = next((c for c in df.columns if "vol" in c), None)
-        close_col = next((c for c in df.columns if c in ("close", "price", "lastprice")), None)
+    # 2. Secondary fallback: vnstock 4.x Trading price_board
+    try:
+        from vnstock.api.trading import Trading
+        t = Trading()
+        sample_symbols = ["FPT", "ACB", "TCB", "VCB", "VNM", "HPG", "VIC", "SSI", "MBB", "MWG"]
+        df = t.price_board(sample_symbols)
+        if df is not None and not df.empty:
+            df.columns = [c.lower() for c in df.columns]
+            ticker_col = next((c for c in df.columns if c in ("ticker", "symbol", "code")), None)
+            change_col = next((c for c in df.columns if "change" in c and "%" in c or "pct" in c), None)
+            vol_col = next((c for c in df.columns if "vol" in c or "qty" in c), None)
+            close_col = next((c for c in df.columns if c in ("close", "price", "lastprice", "matchedprice")), None)
 
-        if not ticker_col:
-            logger.warning("Could not find ticker column in top movers. Columns: %s", df.columns.tolist())
-            return [], []
+            if ticker_col:
+                df = df.rename(columns={ticker_col: "symbol"})
+                if close_col:
+                    df["close"] = pd.to_numeric(df[close_col], errors="coerce")
+                if change_col:
+                    df["change_pct"] = pd.to_numeric(df[change_col], errors="coerce").fillna(0)
+                if vol_col:
+                    df["volume"] = pd.to_numeric(df[vol_col], errors="coerce").fillna(0)
 
-        df = df.rename(columns={ticker_col: "symbol"})
-        if close_col:
-            df["close"] = pd.to_numeric(df[close_col], errors="coerce")
-        if change_col:
-            df["change_pct"] = pd.to_numeric(df[change_col], errors="coerce").fillna(0)
-        if vol_col:
-            df["volume"] = pd.to_numeric(df[vol_col], errors="coerce").fillna(0)
+                top_gainers = (
+                    df[df["change_pct"] > 0]
+                    .nlargest(10, "change_pct")[["symbol", "close", "change_pct"]]
+                    .to_dict(orient="records")
+                ) if "change_pct" in df.columns else []
+                top_volume = (
+                    df.nlargest(10, "volume")[["symbol", "close", "volume"]]
+                    .to_dict(orient="records")
+                ) if "volume" in df.columns else []
+                return top_gainers, top_volume
+    except Exception as err:
+        logger.warning("Vnstock Trading price board fallback error: %s", err)
 
-        top_gainers, top_volume = [], []
-        if "change_pct" in df.columns:
-            top_gainers = (
-                df[df["change_pct"] > 0]
-                .nlargest(10, "change_pct")[["symbol", "close", "change_pct"]]
-                .to_dict(orient="records")
-            )
-        if "volume" in df.columns:
-            top_volume = (
-                df.nlargest(10, "volume")[["symbol", "close", "volume"]]
-                .to_dict(orient="records")
-            )
+    return [], []
 
-        return top_gainers, top_volume
-
-    except Exception as e:
-        logger.error("Failed to fetch top movers: %s", e)
-        return [], []
 
 
 # ---------------------------------------------------------------------------
