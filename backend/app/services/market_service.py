@@ -270,6 +270,57 @@ def _compute_technical_indicators(df: pd.DataFrame) -> dict[str, Any]:
     }
 
 
+def _fetch_historical_ohlcv(symbol: str, start_date: str, end_date: str, interval: str = "1D") -> pd.DataFrame | None:
+    """
+    Safely retrieve historical OHLCV data using vnstock 4.x/3.x Quote API,
+    with fallbacks across multiple sources (VCI, TCBS) and legacy methods.
+    """
+    sym = symbol.upper().strip()
+
+    # 1. Try vnstock 4.x / 3.x Quote API
+    for source in ["VCI", "TCBS"]:
+        try:
+            from vnstock.api.quote import Quote
+            q = Quote(symbol=sym, source=source)
+            df = q.history(start=start_date, end=end_date, interval=interval)
+            if df is not None and not df.empty:
+                return df
+        except Exception:
+            pass
+
+        try:
+            from vnstock import Quote
+            q = Quote(symbol=sym, source=source)
+            df = q.history(start=start_date, end=end_date, interval=interval)
+            if df is not None and not df.empty:
+                return df
+        except Exception:
+            pass
+
+    # 2. Try Vnstock().stock() interface
+    try:
+        from vnstock import Vnstock
+        stock = Vnstock().stock(symbol=sym, source="VCI")
+        df = stock.quote.history(start=start_date, end=end_date, interval=interval)
+        if df is not None and not df.empty:
+            return df
+    except Exception:
+        pass
+
+    # 3. Try legacy stock_historical_data if available
+    try:
+        if hasattr(vn, "stock_historical_data"):
+            df = vn.stock_historical_data(
+                symbol=sym, start_date=start_date, end_date=end_date, resolution=interval
+            )
+            if df is not None and not df.empty:
+                return df
+    except Exception:
+        pass
+
+    return None
+
+
 def _fetch_index_data(symbol: str) -> dict[str, Any]:
     """
     Fetch latest snapshot for a market index (VNINDEX / HNXINDEX / UPCOMINDEX).
@@ -287,28 +338,30 @@ def _fetch_index_data(symbol: str) -> dict[str, Any]:
     try:
         end = datetime.now().strftime("%Y-%m-%d")
         start = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-        df = vn.stock_historical_data(
-            symbol=symbol, start_date=start, end_date=end, resolution="1D", type="index"
-        )
+        df = _fetch_historical_ohlcv(symbol=symbol, start_date=start, end_date=end, interval="1D")
 
         if df is None or df.empty:
             return {"symbol": symbol, "close": None, "change": None, "change_pct": None, "volume": None}
 
+        df.columns = [c.lower() for c in df.columns]
+        close_col = "close" if "close" in df.columns else df.columns[-1]
+
         latest = df.iloc[-1]
-        prev_close = df.iloc[-2]["close"] if len(df) >= 2 else latest["close"]
-        change = round(float(latest["close"]) - float(prev_close), 2)
+        prev_close = df.iloc[-2][close_col] if len(df) >= 2 else latest[close_col]
+        change = round(float(latest[close_col]) - float(prev_close), 2)
         change_pct = round((change / float(prev_close)) * 100, 2) if prev_close else 0.0
 
         return {
             "symbol": symbol,
-            "close": float(latest["close"]),
+            "close": float(latest[close_col]),
             "change": change,
             "change_pct": change_pct,
-            "volume": int(latest.get("volume", 0)),
+            "volume": int(latest.get("volume", 0) or 0),
         }
     except Exception as e:
         logger.warning("Failed to fetch index %s: %s", symbol, e)
         return {"symbol": symbol, "close": None, "change": None, "change_pct": None, "volume": None}
+
 
 
 def _fetch_top_movers() -> tuple[list[dict], list[dict]]:
@@ -430,12 +483,13 @@ def get_stock_detail(
         start_date = (now - timedelta(days=365)).strftime("%Y-%m-%d")
 
         try:
-            df = vn.stock_historical_data(
-                symbol=sym, start_date=start_date, end_date=end_date, resolution="1D"
+            df = _fetch_historical_ohlcv(
+                symbol=sym, start_date=start_date, end_date=end_date, interval="1D"
             )
         except Exception as e:
             logger.warning("Historical data fetch error for %s: %s", sym, e)
             df = None
+
 
         technicals = {}
         records = []

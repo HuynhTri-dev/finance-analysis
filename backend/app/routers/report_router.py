@@ -232,7 +232,14 @@ async def list_reports(db: AsyncSession = Depends(get_db)):
         logger.warning("Failed to fetch reports from Cloudflare R2, falling back to local: %s", err)
 
     # 3. Fallback: Local static storage
-    static_dir = Path(__file__).resolve().parent.parent.parent / "static" / "reports"
+    import tempfile
+    try:
+        static_dir = Path(__file__).resolve().parent.parent.parent / "static" / "reports"
+        if not static_dir.exists():
+            static_dir = Path(tempfile.gettempdir()) / "static" / "reports"
+    except OSError:
+        static_dir = Path(tempfile.gettempdir()) / "static" / "reports"
+
     if not static_dir.exists():
         return {"reports": []}
 
@@ -242,11 +249,12 @@ async def list_reports(db: AsyncSession = Depends(get_db)):
         size_kb = round(p.stat().st_size / 1024, 1)
         reports.append({
             "filename": p.name,
-            "url": f"http://localhost:8001/static/reports/{p.name}",
+            "url": f"/static/reports/{p.name}",
             "size_kb": size_kb,
             "created_at": mtime,
         })
     return {"reports": reports}
+
 
 
 @router.delete("/{report_id}", response_model=ReportDeleteResponse, summary="Delete a Generated PDF Report")
@@ -290,11 +298,16 @@ async def delete_report(report_id: str, db: AsyncSession = Depends(get_db)):
                 key = report_id if report_id.startswith("reports/") else f"reports/{report_id}"
                 deleted_storage = await provider.delete_file(key)
 
-            static_dir = Path(__file__).resolve().parent.parent.parent / "static" / "reports"
+            import tempfile
+            try:
+                static_dir = Path(__file__).resolve().parent.parent.parent / "static" / "reports"
+            except OSError:
+                static_dir = Path(tempfile.gettempdir()) / "static" / "reports"
             local_file = static_dir / report_id
             if local_file.exists():
                 local_file.unlink()
                 deleted_storage = True
+
 
             if deleted_storage:
                 return ReportDeleteResponse(
