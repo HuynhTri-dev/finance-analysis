@@ -71,8 +71,21 @@ export const reportApi = {
 };
 
 export const newsApi = {
-  getNewsBySymbol: async (symbol: string) => {
-    const response = await apiClient.get(`/news/symbol/${symbol}`);
+  getNews: async (type: 'macro' | 'watchlist' = 'macro', limit: number = 20) => {
+    const response = await apiClient.get('/news/', {
+      params: { type, limit },
+    });
+    return response.data;
+  },
+  getNewsBySymbol: async (symbol: string, limit: number = 10) => {
+    const response = await apiClient.get(`/news/symbol/${symbol}`, {
+      params: { limit },
+    });
+    return response.data;
+  },
+  crawlNow: async () => {
+    const response = await apiClient.get('/news/crawl-now');
     return response.data;
   },
 };
+

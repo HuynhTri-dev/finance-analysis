@@ -58,3 +58,29 @@ async def get_news_by_symbol(
         return {"symbol": symbol.upper(), "total": len(articles), "articles": articles}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/crawl-now", summary="Trigger News Crawl (Vercel Cron / Manual)")
+@router.post("/crawl-now", summary="Trigger News Crawl (POST)")
+async def trigger_news_crawl(
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Trigger immediate crawl of macro and watchlist RSS feeds.
+    Designed to be invoked by Vercel Cron Jobs via HTTP GET.
+    """
+    try:
+        macro_count = await news_service.crawl_macro_news(db)
+        watchlist_count = await news_service.crawl_watchlist_news(db)
+        return {
+            "status": "success",
+            "message": "News crawl completed successfully",
+            "inserted": {
+                "macro": macro_count,
+                "watchlist": watchlist_count,
+                "total": macro_count + watchlist_count,
+            },
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Crawl failed: {str(e)}")
+

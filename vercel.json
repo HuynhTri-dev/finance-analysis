@@ -1,0 +1,26 @@
+{
+  "crons": [
+    {
+      "path": "/api/news/crawl-now",
+      "schedule": "0 1 * * 1-5"
+    },
+    {
+      "path": "/api/news/crawl-now",
+      "schedule": "30 4 * * 1-5"
+    },
+    {
+      "path": "/api/news/crawl-now",
+      "schedule": "30 9 * * 1-5"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/backend/app/main.py"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/frontend/$1"
+    }
+  ]
+}
