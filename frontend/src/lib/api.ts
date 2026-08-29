@@ -64,6 +64,10 @@ export const reportApi = {
     const response = await apiClient.get('/report/list');
     return response.data;
   },
+  deleteReport: async (reportId: string) => {
+    const response = await apiClient.delete(`/report/${reportId}`);
+    return response.data;
+  },
 };
 
 export const newsApi = {

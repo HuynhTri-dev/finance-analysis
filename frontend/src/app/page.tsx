@@ -30,6 +30,8 @@ import {
   PanelRightOpen,
   Sparkles,
   Menu,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import { marketApi, watchlistApi, analyzeApi, newsApi, reportApi } from "@/lib/api";
 import {
@@ -58,6 +60,8 @@ export default function Home() {
   const [searchSymbol, setSearchSymbol] = useState("");
   const [agentLogs, setAgentLogs] = useState<{ type: string; content: string }[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isGeneratingQuickPdf, setIsGeneratingQuickPdf] = useState(false);
+  const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
   const [sidebarTab, setSidebarTab] = useState<"chat" | "pdf">("chat");
   const [pdfReports, setPdfReports] = useState<any[]>([]);
   const [selectedPdf, setSelectedPdf] = useState<string | null>(null);
@@ -267,7 +271,8 @@ export default function Home() {
    * Triggers quick PDF report generation and reveals right panel preview
    */
   const handleGenerateQuickReport = async () => {
-    if (!activeSymbol) return;
+    if (!activeSymbol || isGeneratingQuickPdf || isAnalyzing) return;
+    setIsGeneratingQuickPdf(true);
     setIsRightSidebarOpen(true);
     setSidebarTab("chat");
     try {
@@ -279,6 +284,38 @@ export default function Home() {
       }
     } catch (e) {
       setAgentLogs(prev => [...prev, { type: "error", content: "Lỗi khi tạo PDF báo cáo." }]);
+    } finally {
+      setIsGeneratingQuickPdf(false);
+    }
+  };
+
+  /**
+   * Deletes a generated PDF report from PostgreSQL (Neon) and storage
+   * @param {React.MouseEvent} e - Mouse event to stop propagation
+   * @param {any} report - Report item object to delete
+   */
+  const handleDeleteReport = async (e: React.MouseEvent, report: any) => {
+    e.stopPropagation();
+    const reportId = report.id || report.filename;
+    if (!reportId) return;
+
+    const confirmMsg = `Bạn có chắc chắn muốn xoá báo cáo "${report.title || report.filename}"?`;
+    if (!window.confirm(confirmMsg)) {
+      return;
+    }
+
+    try {
+      setDeletingReportId(reportId);
+      await reportApi.deleteReport(reportId);
+      if (selectedPdf === report.url) {
+        setSelectedPdf(null);
+      }
+      await fetchPdfReports();
+    } catch (err) {
+      console.error("Failed to delete report:", err);
+      alert("Lỗi khi xoá báo cáo.");
+    } finally {
+      setDeletingReportId(null);
     }
   };
 
@@ -632,11 +669,20 @@ export default function Home() {
                   <div className="flex items-center space-x-2 sm:space-x-2.5">
                     <button
                       onClick={handleGenerateQuickReport}
-                      disabled={isAnalyzing}
-                      className="px-3 sm:px-3.5 py-2 bg-[#21262D] hover:bg-[#30363D] text-gray-200 text-xs font-semibold rounded-lg border border-[#30363D] transition-colors flex items-center space-x-1.5 disabled:opacity-50"
+                      disabled={isGeneratingQuickPdf || isAnalyzing}
+                      className={`px-3 sm:px-3.5 py-2 text-xs font-semibold rounded-lg border transition-all flex items-center space-x-1.5 ${
+                        isGeneratingQuickPdf
+                          ? "bg-blue-600/20 text-blue-300 border-blue-500/40 cursor-not-allowed opacity-90 shadow-sm"
+                          : "bg-[#21262D] hover:bg-[#30363D] text-gray-200 border-[#30363D] disabled:opacity-50"
+                      }`}
+                      title={isGeneratingQuickPdf ? "Hệ thống đang tổng hợp dữ liệu và tạo PDF..." : "Tạo và tải báo cáo PDF nhanh"}
                     >
-                      <FileText size={14} className="text-blue-400" />
-                      <span>Tải PDF Nhanh</span>
+                      {isGeneratingQuickPdf ? (
+                        <RefreshCw size={14} className="text-blue-400 animate-spin" />
+                      ) : (
+                        <FileText size={14} className="text-blue-400" />
+                      )}
+                      <span>{isGeneratingQuickPdf ? "Đang tạo PDF..." : "Tải PDF Nhanh"}</span>
                     </button>
 
                     <button
@@ -1231,10 +1277,17 @@ export default function Home() {
                             <div className="w-8 h-8 rounded-lg bg-rose-950/40 border border-rose-800/40 text-rose-400 flex items-center justify-center flex-shrink-0 mt-0.5">
                               <FileText size={16} />
                             </div>
-                            <div className="min-w-0">
-                              <h4 className="text-xs font-semibold text-gray-200 line-clamp-1">
-                                {report.filename.replace(".pdf", "")}
-                              </h4>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-1">
+                                <h4 className="text-xs font-semibold text-gray-200 line-clamp-1">
+                                  {report.title || report.filename.replace(".pdf", "")}
+                                </h4>
+                                {report.symbol && (
+                                  <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-blue-500/15 text-blue-400 border border-blue-500/30 flex-shrink-0">
+                                    {report.symbol}
+                                  </span>
+                                )}
+                              </div>
                               <div className="flex items-center space-x-2 text-[11px] text-gray-500 mt-0.5">
                                 <span>{report.size_kb ? `${report.size_kb} KB` : ''}</span>
                                 <span>•</span>
@@ -1256,11 +1309,23 @@ export default function Home() {
                             href={report.url}
                             target="_blank"
                             rel="noreferrer"
-                            className="px-2.5 py-1.5 bg-[#21262D] hover:bg-[#30363D] text-gray-300 text-xs rounded-lg flex items-center justify-center transition-colors border border-[#30363D]"
+                            className="px-2.5 py-1.5 bg-[#21262D] hover:bg-[#30363D] text-gray-300 hover:text-white text-xs rounded-lg flex items-center justify-center transition-colors border border-[#30363D]"
                             title="Mở tab mới"
                           >
                             <ExternalLink size={13} />
                           </a>
+                          <button
+                            onClick={(e) => handleDeleteReport(e, report)}
+                            disabled={deletingReportId === (report.id || report.filename)}
+                            className="px-2.5 py-1.5 bg-[#21262D] hover:bg-rose-950/40 text-gray-400 hover:text-rose-400 text-xs rounded-lg flex items-center justify-center transition-colors border border-[#30363D] hover:border-rose-800/40 disabled:opacity-50"
+                            title="Xoá báo cáo này"
+                          >
+                            {deletingReportId === (report.id || report.filename) ? (
+                              <Loader2 size={13} className="animate-spin text-rose-400" />
+                            ) : (
+                              <Trash2 size={13} />
+                            )}
+                          </button>
                         </div>
                       </div>
                     ))

@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -131,4 +131,61 @@ class NewsArticle(Base):
         back_populates="articles",
         lazy="selectin",
         doc="List of watchlist symbols linked to this article.",
+    )
+
+
+class GeneratedReport(Base):
+    """
+    GeneratedReport entity storing metadata and access URLs of PDF reports.
+    """
+    __tablename__ = "generated_report"
+
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid4()),
+        doc="UUID string uniquely identifying the generated report.",
+    )
+    title: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        doc="Human-readable title of the report.",
+    )
+    report_type: Mapped[str] = mapped_column(
+        String(50),
+        index=True,
+        nullable=False,
+        doc="Type of report: 'quick_symbol', 'ai_overview', 'ai_detail'.",
+    )
+    symbol: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        index=True,
+        nullable=True,
+        doc="Ticker symbol if the report is symbol-specific.",
+    )
+    filename: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        doc="File name of the report artifact.",
+    )
+    storage_path: Mapped[str] = mapped_column(
+        String(500),
+        nullable=False,
+        doc="Storage path/key in Cloudflare R2 or local static directory.",
+    )
+    pdf_url: Mapped[str] = mapped_column(
+        String(1000),
+        nullable=False,
+        doc="Publicly accessible or presigned download URL.",
+    )
+    size_kb: Mapped[Optional[float]] = mapped_column(
+        Float,
+        nullable=True,
+        doc="File size in kilobytes.",
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_utc_now,
+        index=True,
+        doc="Timestamp when the report was created.",
     )

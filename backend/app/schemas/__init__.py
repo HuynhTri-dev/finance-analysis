@@ -21,6 +21,7 @@ from app.schemas.news_schema import (
     NewsSymbolResponse,
 )
 from app.schemas.report_schema import (
+    ReportDeleteResponse,
     ReportItemResponse,
     ReportListResponse,
     ReportResponse,
@@ -51,6 +52,7 @@ __all__ = [
     "ReportResponse",
     "ReportItemResponse",
     "ReportListResponse",
+    "ReportDeleteResponse",
     # Market
     "BatchQuoteItem",
     "IndexQuote",
