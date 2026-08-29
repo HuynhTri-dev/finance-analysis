@@ -1,6 +1,4 @@
 {
-  "buildCommand": "npm --prefix frontend install && npm --prefix frontend run build",
-  "outputDirectory": "frontend/.next",
   "crons": [
     {
       "path": "/api/news/crawl-now",
@@ -13,12 +11,6 @@
     {
       "path": "/api/news/crawl-now",
       "schedule": "30 9 * * 1-5"
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/index.py"
     }
   ]
 }
