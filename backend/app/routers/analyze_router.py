@@ -104,12 +104,18 @@ async def _upload_report_to_storage(content: str, filename: str) -> dict | None:
 
         if not url:
             # Fallback to local static file
-            static_dir = Path(__file__).resolve().parent.parent.parent / "static" / "reports"
-            static_dir.mkdir(parents=True, exist_ok=True)
+            import tempfile
+            try:
+                static_dir = Path(__file__).resolve().parent.parent.parent / "static" / "reports"
+                static_dir.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                static_dir = Path(tempfile.gettempdir()) / "static" / "reports"
+                static_dir.mkdir(parents=True, exist_ok=True)
             local_file_path = static_dir / filename
             local_file_path.write_bytes(pdf_bytes)
-            url = f"http://localhost:8001/static/reports/{filename}"
+            url = f"/static/reports/{filename}"
             object_name = f"local://static/reports/{filename}"
+
 
         return {
             "url": url,

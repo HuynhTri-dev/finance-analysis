@@ -52,13 +52,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+import tempfile
 from pathlib import Path
 from fastapi.staticfiles import StaticFiles
 
-static_dir = Path(__file__).resolve().parent.parent / "static"
-static_dir.mkdir(parents=True, exist_ok=True)
-(static_dir / "reports").mkdir(parents=True, exist_ok=True)
+try:
+    static_dir = Path(__file__).resolve().parent.parent / "static"
+    static_dir.mkdir(parents=True, exist_ok=True)
+    (static_dir / "reports").mkdir(parents=True, exist_ok=True)
+except OSError:
+    # Serverless runtime (e.g. Vercel/AWS Lambda where root is read-only)
+    static_dir = Path(tempfile.gettempdir()) / "static"
+    static_dir.mkdir(parents=True, exist_ok=True)
+    (static_dir / "reports").mkdir(parents=True, exist_ok=True)
+
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
 
 # ---------------------------------------------------------------------------
 # Routers
