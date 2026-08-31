@@ -1,23 +1,35 @@
-fastapi
-uvicorn
+# ─── FastAPI & Server ────────────────────────────────────────────────────────
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+
+# ─── Database & ORM ──────────────────────────────────────────────────────────
 sqlalchemy==2.0.51
 alembic>=1.13.0
-psycopg2-binary
-asyncpg
-greenlet
-pydantic
-pydantic-settings
-python-dotenv
-vnstock
-pandas
-feedparser
-beautifulsoup4
-aiohttp
-apscheduler
-markdown
-aioboto3
-boto3
-eval_type_backport
-fpdf2
-requests
-redis
+psycopg2-binary>=2.9.9
+asyncpg>=0.30.0
+greenlet>=3.1.0
+
+# ─── Validation & Config ─────────────────────────────────────────────────────
+pydantic>=2.10.0
+pydantic-settings>=2.7.0
+python-dotenv>=1.0.1
+
+# ─── Financial Data & Market ─────────────────────────────────────────────────
+vnstock>=4.0.7
+pandas>=2.2.0
+
+# ─── News Crawling & Background Scheduler ────────────────────────────────────
+feedparser>=6.0.11
+beautifulsoup4>=4.12.3
+aiohttp>=3.9.0
+apscheduler>=3.10.4
+
+# ─── Storage (Cloudflare R2) & Reports ───────────────────────────────────────
+aioboto3>=13.0.0
+boto3>=1.35.0
+markdown>=3.6
+fpdf2>=2.8.0
+
+# ─── Utilities ───────────────────────────────────────────────────────────────
+eval_type_backport>=0.2.0
+requests>=2.31.0

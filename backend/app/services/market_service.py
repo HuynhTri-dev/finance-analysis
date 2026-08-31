@@ -454,6 +454,20 @@ def get_market_overview() -> dict[str, Any]:
     return _cached("market_overview", _TTL_OVERVIEW_SECONDS, _build)
 
 
+def _clean_nan_inf(val: Any) -> Any:
+    """
+    Recursively replace NaN and Inf float values with None to prevent JSON serialization errors.
+    """
+    if isinstance(val, dict):
+        return {k: _clean_nan_inf(v) for k, v in val.items()}
+    elif isinstance(val, list):
+        return [_clean_nan_inf(v) for v in val]
+    elif isinstance(val, float):
+        if np.isnan(val) or np.isinf(val):
+            return None
+    return val
+
+
 def get_stock_detail(
     symbol: str,
     timeframe: str = "3M",
@@ -511,6 +525,27 @@ def get_stock_detail(
             df["ma20"] = df["close"].rolling(window=20).mean().round(2)
             df["ma50"] = df["close"].rolling(window=50).mean().round(2)
 
+            # Calculate Bollinger Bands
+            std20 = df["close"].rolling(window=20).std()
+            df["bb_upper"] = (df["ma20"] + 2 * std20).round(2)
+            df["bb_lower"] = (df["ma20"] - 2 * std20).round(2)
+
+            # Calculate RSI series
+            delta = df["close"].diff()
+            gain = delta.where(delta > 0, 0.0)
+            loss = -delta.where(delta < 0, 0.0)
+            avg_gain = gain.rolling(window=14).mean()
+            avg_loss = loss.rolling(window=14).mean()
+            
+            # Avoid division by zero
+            with np.errstate(divide='ignore', invalid='ignore'):
+                rs = avg_gain / avg_loss
+                df["rsi"] = 100.0 - (100.0 / (1.0 + rs))
+            
+            df.loc[avg_loss == 0, "rsi"] = 100.0
+            df.loc[(avg_gain == 0) & (avg_loss == 0), "rsi"] = 50.0
+            df["rsi"] = df["rsi"].round(2)
+
             # Compute technical indicators
             technicals = _compute_technical_indicators(df)
 
@@ -541,7 +576,7 @@ def get_stock_detail(
                     quote_data["change"] = round(quote_data["price"] - prev_close, 2)
                     quote_data["change_pct"] = round((quote_data["change"] / prev_close) * 100, 2)
 
-        return {
+        return _clean_nan_inf({
             "symbol": sym,
             "company_name": quote_data.get("company_name_vi", f"Công ty Cổ phần {sym}"),
             "company_name_en": quote_data.get("company_name_en", f"{sym} Corporation"),
@@ -561,7 +596,7 @@ def get_stock_detail(
             },
             # Compatibility field so legacy consumers expecting top-level records won't break
             "records": records,
-        }
+        })
 
     return _cached(cache_key, _TTL_QUOTE_SECONDS, _build)
 
