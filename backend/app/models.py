@@ -67,6 +67,13 @@ class Watchlist(Base):
         default=True,
         doc="Flag indicating whether this watchlist item is active.",
     )
+    is_holding: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+        server_default="false",
+        doc="Flag indicating whether this watchlist item is currently held by the user.",
+    )
 
     # Relationships
     articles: Mapped[List[NewsArticle]] = relationship(

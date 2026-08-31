@@ -28,6 +28,74 @@ import {
   RightSidebar,
 } from "@/components";
 
+const getRecommendation = (detail: any) => {
+  if (!detail) return { type: "HOLD", title: "THEO DÕI", reason: "Chưa đủ dữ liệu phân tích kỹ thuật", color: "amber" };
+  
+  const records = detail.history?.records || detail.records || [];
+  if (records.length === 0) return { type: "HOLD", title: "THEO DÕI", reason: "Chưa đủ lịch sử giao dịch", color: "amber" };
+  
+  const last = records[records.length - 1];
+  const rsi = last.rsi || 50;
+  const close = last.close || 0;
+  const ma20 = last.ma20;
+  const ma50 = last.ma50;
+  const bbUpper = last.bb_upper;
+  const bbLower = last.bb_lower;
+  
+  let buyScore = 0;
+  let sellScore = 0;
+  let reasons: string[] = [];
+  
+  if (rsi < 40) {
+    buyScore += 2;
+    reasons.push(`Chỉ báo RSI chạm mức quá bán (${rsi})`);
+  } else if (rsi > 65) {
+    sellScore += 2;
+    reasons.push(`Chỉ báo RSI chạm mức quá mua (${rsi})`);
+  }
+  
+  if (bbLower && close <= bbLower * 1.015) {
+    buyScore += 2;
+    reasons.push("Giá đóng cửa giảm mạnh chạm dải dưới Bollinger Bands");
+  } else if (bbUpper && close >= bbUpper * 0.985) {
+    sellScore += 2;
+    reasons.push("Giá tăng mạnh vượt dải trên Bollinger Bands");
+  }
+  
+  if (ma20 && ma50) {
+    if (ma20 > ma50) {
+      buyScore += 1;
+      reasons.push("Xu hướng MA20 nằm trên MA50 (Tích cực)");
+    } else {
+      sellScore += 1;
+      reasons.push("Xu hướng MA20 nằm dưới MA50 (Tiêu cực)");
+    }
+  }
+  
+  if (buyScore >= 3) {
+    return {
+      type: "BUY",
+      title: buyScore >= 4 ? "MUA MẠNH" : "MUA",
+      reason: reasons.join(", "),
+      color: "emerald",
+    };
+  } else if (sellScore >= 3) {
+    return {
+      type: "SELL",
+      title: sellScore >= 4 ? "BÁN MẠNH" : "BÁN",
+      reason: reasons.join(", "),
+      color: "rose",
+    };
+  }
+  
+  return {
+    type: "HOLD",
+    title: "TIẾP TỤC NẮM GIỮ",
+    reason: reasons.length > 0 ? reasons.join(", ") : "Các chỉ báo kỹ thuật (RSI, Bollinger Bands, MA) ở trạng thái trung lập ổn định",
+    color: "amber",
+  };
+};
+
 export default function Home() {
   const [overview, setOverview] = useState<any>(null);
   const [watchlist, setWatchlist] = useState<any[]>([]);
@@ -52,6 +120,41 @@ export default function Home() {
   // Layout sidebar collapsible states
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);
+
+  // Holdings state & sync
+  const [holdings, setHoldings] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("finance_holdings");
+      if (saved) {
+        try {
+          setHoldings(JSON.parse(saved));
+        } catch (e) {
+          console.error("Error parsing holdings:", e);
+        }
+      }
+    }
+  }, []);
+
+  const handleToggleHolding = async (symbol: string) => {
+    try {
+      // Optimistic UI update
+      setHoldings((prev) =>
+        prev.includes(symbol)
+          ? prev.filter((s) => s !== symbol)
+          : [...prev, symbol]
+      );
+      
+      // Update database
+      await watchlistApi.toggleHolding(symbol);
+      
+      // Refresh initial data silently to keep state in sync
+      fetchInitialData(false);
+    } catch (e) {
+      console.error("Failed to toggle holding status in database:", e);
+    }
+  };
 
   /**
    * Fetches list of generated PDF reports from the backend
@@ -104,6 +207,12 @@ export default function Home() {
         typeof item === "string" ? item : item.symbol
       );
       setWatchlist(symbolsRaw);
+
+      // Initialize holdings from database response
+      const dbHoldings = symbolsRaw
+        .filter((item: any) => item.is_holding)
+        .map((item: any) => item.symbol);
+      setHoldings(dbHoldings);
 
       if (symbolsClean.length > 0) {
         fetchWatchlistQuotes(symbolsClean);
@@ -341,6 +450,8 @@ export default function Home() {
         onAddWatchlist={handleAddWatchlist}
         onRemoveWatchlist={handleRemoveWatchlist}
         onRefreshQuotes={() => fetchInitialData(false)}
+        holdings={holdings}
+        onToggleHolding={handleToggleHolding}
       />
 
       {/* 2. Main Dashboard Panel */}
@@ -379,6 +490,8 @@ export default function Home() {
                 isAnalyzing={isAnalyzing}
                 onGenerateQuickReport={handleGenerateQuickReport}
                 onAnalyze={handleAnalyze}
+                isHolding={activeSymbol ? holdings.includes(activeSymbol) : false}
+                recommendation={symbolDetail ? getRecommendation(symbolDetail) : null}
               />
 
               {/* 2. Key Stats Strip */}

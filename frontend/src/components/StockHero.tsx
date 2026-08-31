@@ -2,6 +2,7 @@
  * @file StockHero.tsx
  * @description Hero banner for the selected stock displaying symbol ticker, exchange, company name,
  * real-time price, price delta badges, and quick action trigger buttons (PDF generation & AI assessment).
+ * Also integrates holding status badges and sell recommendations for active holdings.
  */
 
 "use client";
@@ -16,6 +17,8 @@ export interface StockHeroProps {
   isAnalyzing: boolean;
   onGenerateQuickReport: () => void;
   onAnalyze: () => void;
+  isHolding?: boolean;
+  recommendation?: any;
 }
 
 export const StockHero: React.FC<StockHeroProps> = ({
@@ -25,6 +28,8 @@ export const StockHero: React.FC<StockHeroProps> = ({
   isAnalyzing,
   onGenerateQuickReport,
   onAnalyze,
+  isHolding = false,
+  recommendation = null,
 }) => {
   const quote = symbolDetail?.quote || {};
   const isPriceUp = (quote.change || 0) > 0;
@@ -42,6 +47,7 @@ export const StockHero: React.FC<StockHeroProps> = ({
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 bg-[#161B22] border border-[#30363D] p-4 sm:p-5 rounded-xl shadow-sm">
+      {/* Symbol details */}
       <div className="flex items-center space-x-3 sm:space-x-4 min-w-0">
         <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-blue-600/10 border border-blue-500/30 flex items-center justify-center font-black text-lg sm:text-xl text-blue-400 flex-shrink-0">
           {activeSymbol}
@@ -52,6 +58,11 @@ export const StockHero: React.FC<StockHeroProps> = ({
             <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-[#21262D] text-gray-300 border border-[#30363D]">
               {symbolDetail?.exchange || "HOSE"}
             </span>
+            {isHolding && (
+              <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider">
+                Đang nắm giữ
+              </span>
+            )}
           </div>
           <p className="text-xs text-gray-400 mt-0.5 truncate">
             {symbolDetail?.company_name || "Công ty Cổ phần"}
@@ -112,6 +123,46 @@ export const StockHero: React.FC<StockHeroProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Quantitative recommendation warning banner */}
+      {recommendation && (
+        <div className={`w-full mt-3 p-3 rounded-lg border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs transition-all ${
+          recommendation.type === "BUY"
+            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+            : recommendation.type === "SELL"
+            ? "bg-rose-500/10 border-rose-500/20 text-rose-400"
+            : "bg-amber-500/10 border-amber-500/20 text-amber-400"
+        }`}>
+          <div>
+            <div className="flex flex-wrap items-center gap-1.5 font-bold">
+              <span>Đánh giá thuật toán:</span>
+              <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border ${
+                recommendation.type === "BUY"
+                  ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-400"
+                  : recommendation.type === "SELL"
+                  ? "bg-rose-500/20 border-rose-500/30 text-rose-400"
+                  : "bg-amber-500/20 border-amber-500/30 text-amber-400"
+              }`}>
+                {recommendation.title}
+              </span>
+              {isHolding && (
+                <span className="bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] px-1.5 py-0.5 rounded font-extrabold">
+                  ĐANG NẮM GIỮ (PORTFOLIO)
+                </span>
+              )}
+            </div>
+            <p className="text-gray-300 leading-relaxed text-[11px] mt-1">
+              {recommendation.reason}
+            </p>
+          </div>
+
+          {isHolding && recommendation.type === "SELL" && (
+            <div className="flex-shrink-0 bg-rose-600 text-white font-extrabold text-[10px] px-3 py-1.5 rounded-lg shadow-md uppercase tracking-wider animate-pulse">
+              ⚠️ KHUYẾN NGHỊ BÁN (HẠ TỶ TRỌNG)
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

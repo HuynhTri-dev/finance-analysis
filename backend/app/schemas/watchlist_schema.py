@@ -34,6 +34,7 @@ class WatchlistSymbolItem(BaseModel):
     """Minimal symbol item for API response listing."""
     symbol: str = Field(..., description="Stock ticker symbol.")
     added_at: str = Field(..., description="ISO 8601 formatted timestamp string.")
+    is_holding: bool = Field(default=False, description="Flag indicating if the stock is held in the portfolio.")
 
 
 class WatchlistListResponse(BaseModel):

@@ -43,6 +43,10 @@ export const watchlistApi = {
     const response = await apiClient.delete(`/watchlist/${symbol}`);
     return response.data;
   },
+  toggleHolding: async (symbol: string) => {
+    const response = await apiClient.post(`/watchlist/${symbol}/toggle-holding`);
+    return response.data;
+  },
 };
 
 export const analyzeApi = {

@@ -36,7 +36,14 @@ async def list_watchlist(db: AsyncSession = Depends(get_db)):
     items = result.scalars().all()
     return {
         "total": len(items),
-        "symbols": [{"symbol": i.symbol, "added_at": i.added_at.isoformat()} for i in items],
+        "symbols": [
+            {
+                "symbol": i.symbol,
+                "added_at": i.added_at.isoformat(),
+                "is_holding": i.is_holding,
+            }
+            for i in items
+        ],
     }
 
 
@@ -53,6 +60,21 @@ async def add_to_watchlist(request: WatchlistAddRequest, db: AsyncSession = Depe
     await db.execute(stmt)
     await db.commit()
     return {"message": f"{symbol} added to watchlist.", "symbol": symbol}
+
+
+@router.post("/{symbol}/toggle-holding", response_model=WatchlistActionResponse, summary="Toggle holding status for a symbol")
+async def toggle_holding(symbol: str, db: AsyncSession = Depends(get_db)):
+    symbol = symbol.upper()
+    result = await db.execute(select(Watchlist).where(Watchlist.symbol == symbol))
+    item = result.scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail=f"Symbol '{symbol}' not found in watchlist.")
+    
+    item.is_holding = not item.is_holding
+    await db.commit()
+    
+    status_str = "holding" if item.is_holding else "watchlist"
+    return {"message": f"{symbol} status toggled to {status_str}.", "symbol": symbol}
 
 
 @router.delete("/{symbol}", response_model=WatchlistActionResponse, summary="Remove a symbol from the watchlist")

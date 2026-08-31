@@ -7,7 +7,7 @@
 "use client";
 
 import React from "react";
-import { TrendingUp, PanelLeftClose, Search, RefreshCw, X } from "lucide-react";
+import { TrendingUp, PanelLeftClose, Search, RefreshCw, X, Briefcase } from "lucide-react";
 
 export interface LeftSidebarProps {
   isOpen: boolean;
@@ -21,20 +21,24 @@ export interface LeftSidebarProps {
   onAddWatchlist: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   onRemoveWatchlist: (e: React.MouseEvent, symbol: string) => void;
   onRefreshQuotes: () => void;
+  holdings?: string[];
+  onToggleHolding?: (symbol: string) => void;
 }
 
 export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   isOpen,
   onClose,
-  watchlist,
-  watchlistQuotes,
-  activeSymbol,
+  watchlist = [],
+  watchlistQuotes = {},
+  activeSymbol = null,
   onSelectSymbol,
-  searchSymbol,
+  searchSymbol = "",
   onSearchChange,
   onAddWatchlist,
   onRemoveWatchlist,
   onRefreshQuotes,
+  holdings = [],
+  onToggleHolding = () => {},
 }) => {
   return (
     <>
@@ -117,6 +121,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                 const changePct = q.change_pct !== undefined ? q.change_pct : null;
                 const isUp = (changePct || 0) > 0;
                 const isDown = (changePct || 0) < 0;
+                const isHolding = holdings.includes(sym);
 
                 return (
                   <div
@@ -129,7 +134,14 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                     }`}
                   >
                     <div className="flex flex-col min-w-0 pr-2">
-                      <span className="font-bold text-sm text-gray-100">{sym}</span>
+                      <span className="font-bold text-sm text-gray-100 flex items-center gap-1.5">
+                        {sym}
+                        {isHolding && (
+                          <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-semibold px-1 py-0.2 rounded-md">
+                            Đang nắm giữ
+                          </span>
+                        )}
+                      </span>
                       <span className="text-[10px] text-gray-400 truncate max-w-[110px]">
                         {q.company_name || "Cổ phiếu"}
                       </span>
@@ -152,13 +164,30 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                         )}
                       </div>
 
-                      <button
-                        onClick={(e) => onRemoveWatchlist(e, sym)}
-                        className="opacity-0 group-hover:opacity-100 p-1 text-gray-500 hover:text-rose-400 hover:bg-[#30363D] rounded transition-all"
-                        title="Xóa khỏi danh sách"
-                      >
-                        <X size={13} />
-                      </button>
+                      <div className="flex items-center space-x-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleHolding(sym);
+                          }}
+                          className={`p-1 rounded hover:bg-[#30363D] transition-all ${
+                            isHolding 
+                              ? "text-emerald-400 opacity-100" 
+                              : "opacity-0 group-hover:opacity-100 text-gray-500 hover:text-emerald-400"
+                          }`}
+                          title={isHolding ? "Hủy đánh dấu đang nắm giữ" : "Đánh dấu đang nắm giữ"}
+                        >
+                          <Briefcase size={12} />
+                        </button>
+
+                        <button
+                          onClick={(e) => onRemoveWatchlist(e, sym)}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-gray-500 hover:text-rose-400 hover:bg-[#30363D] rounded transition-all"
+                          title="Xóa khỏi danh sách"
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );

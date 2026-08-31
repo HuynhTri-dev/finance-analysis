@@ -28,7 +28,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 
-from app.infra.database import async_session_maker
+from app.infra.database import async_session_maker, engine
+from sqlalchemy import text
 from app.routers import analyze_router, market_router, news_router, watchlist_router, report_router
 from app.services import news_service
 
@@ -114,6 +115,14 @@ async def _run_crawl_job() -> None:
 @app.on_event("startup")
 async def on_startup() -> None:
     """Register cron jobs on app startup."""
+    # Auto migrate Watchlist table by adding 'is_holding' if not exists
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS is_holding BOOLEAN DEFAULT FALSE;"))
+        logger.info("Database migration successful: verified 'is_holding' exists in 'watchlist'")
+    except Exception as e:
+        logger.warning("Database migration check failed: %s", e)
+
     # Morning crawl — 08:00 ICT
     scheduler.add_job(_run_crawl_job, CronTrigger(hour=1, minute=0, timezone="UTC"), id="crawl_morning")
     # Midday crawl — 11:30 ICT
