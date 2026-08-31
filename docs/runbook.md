@@ -26,7 +26,7 @@ ALEMBIC_DATABASE_URL="postgresql+psycopg2://<user>:<password>@<host_unpooled>/<d
 ### Frontend Environment
 If needed, create a `.env.local` file in the `frontend/` directory:
 ```env
-NEXT_PUBLIC_API_URL="http://localhost:8001/api"
+BASE_API_URL="http://localhost:8001/api"
 ```
 
 ## 3. Backend Setup & Execution
