@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, String, Text
+from sqlalchemy import Boolean, DateTime, Date, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -195,4 +195,94 @@ class GeneratedReport(Base):
         default=_utc_now,
         index=True,
         doc="Timestamp when the report was created.",
+    )
+
+
+class TopRecommendation(Base):
+    """
+    TopRecommendation entity storing the daily market scan results.
+    Each record represents a stock that meets the quantitative buy criteria
+    (RSI oversold, Bollinger Band lower touch, MA cross). The days_in_top
+    field tracks consecutive days a symbol has held the top status, which
+    serves as a FOMO / demand signal for the user.
+    """
+    __tablename__ = "top_recommendation"
+
+    symbol: Mapped[str] = mapped_column(
+        String(20),
+        primary_key=True,
+        index=True,
+        doc="Stock ticker symbol.",
+    )
+    recommended_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_utc_now,
+        doc="Date when this stock was last confirmed in the top recommendation list.",
+    )
+    first_recommended_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_utc_now,
+        doc="Date when this stock first entered the top recommendation list.",
+    )
+    days_in_top: Mapped[int] = mapped_column(
+        Integer,
+        default=1,
+        nullable=False,
+        doc="Consecutive days this symbol has remained in the Top Buy list (FOMO indicator).",
+    )
+    tech_score: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False,
+        doc="Composite technical score (RSI + Bollinger + MA contributions).",
+    )
+    rating: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        doc="Recommendation label: 'MUA MẠNH', 'MUA'.",
+    )
+    reason: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        doc="Detailed reason string explaining why the stock passed the filter.",
+    )
+    price: Mapped[Optional[float]] = mapped_column(
+        Float,
+        nullable=True,
+        doc="Latest closing price at time of scan.",
+    )
+    rsi: Mapped[Optional[float]] = mapped_column(
+        Float,
+        nullable=True,
+        doc="RSI(14) value at time of scan.",
+    )
+    ma20: Mapped[Optional[float]] = mapped_column(
+        Float,
+        nullable=True,
+        doc="MA20 value at time of scan.",
+    )
+    ma50: Mapped[Optional[float]] = mapped_column(
+        Float,
+        nullable=True,
+        doc="MA50 value at time of scan.",
+    )
+    bb_upper: Mapped[Optional[float]] = mapped_column(
+        Float,
+        nullable=True,
+        doc="Bollinger Band upper value at time of scan.",
+    )
+    bb_lower: Mapped[Optional[float]] = mapped_column(
+        Float,
+        nullable=True,
+        doc="Bollinger Band lower value at time of scan.",
+    )
+    exchange: Mapped[Optional[str]] = mapped_column(
+        String(10),
+        nullable=True,
+        doc="Exchange listing (HOSE, HNX, UPCOM).",
+    )
+    volume: Mapped[Optional[float]] = mapped_column(
+        Float,
+        nullable=True,
+        doc="Trading volume at time of scan.",
     )

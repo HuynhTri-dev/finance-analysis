@@ -11,7 +11,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas import BatchQuoteItem
-from app.services import market_service
+from app.services import market_service, scanner_service
 
 router = APIRouter(prefix="/api/market", tags=["Market"])
 
@@ -83,3 +83,36 @@ def get_batch_quotes(
         return market_service.get_batch_quotes(symbol_list)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch batch quotes: {e}")
+
+
+@router.get("/top-recommendations", summary="Get Top Buy Recommendations from last nightly scan")
+async def get_top_recommendations(limit: int = Query(20, ge=1, le=100)):
+    """
+    Returns the top-scored stocks from the most recent nightly market scanner run.
+    Each record includes technical score, days_in_top (FOMO streak), RSI, Bollinger Bands, and MAs.
+
+    Output:
+        list[dict]: Top recommendation list sorted by tech_score desc, then days_in_top desc.
+    """
+    try:
+        data = await scanner_service.get_top_recommendations(limit=limit)
+        return {"total": len(data), "items": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch top recommendations: {e}")
+
+
+@router.post("/scan-top", summary="Manually trigger nightly market scanner")
+async def trigger_scan():
+    """
+    Manually trigger the full-market quantitative scan immediately (outside the scheduled 15:30 ICT window).
+    Useful for initial population of the top_recommendation table or on-demand refresh.
+    Note: This scans all HOSE symbols and may take 10-15 minutes to complete.
+
+    Output:
+        dict: Scanner summary (scanned, qualified, errors, elapsed_seconds, top_symbols).
+    """
+    try:
+        summary = await scanner_service.run_market_scan()
+        return {"status": "complete", "summary": summary}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Market scan failed: {e}")

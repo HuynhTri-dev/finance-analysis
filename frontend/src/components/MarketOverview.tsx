@@ -1,13 +1,15 @@
 /**
  * @file MarketOverview.tsx
  * @description General Vietnam stock market overview view displaying key index cards (VNINDEX, HNXINDEX, UPCOMINDEX),
- * AI Market-Wide Analysis banner, top gainers, and top liquidity volume tables.
+ * AI Market-Wide Analysis banner, top gainers, top liquidity volume tables, and a dynamic
+ * "Top Buy Recommendations" table populated from the nightly backend quantitative scanner.
  */
 
 "use client";
 
-import React from "react";
-import { Bot, TrendingUp, Activity } from "lucide-react";
+import React, { useEffect, useState, useCallback } from "react";
+import { Bot, TrendingUp, Activity, RefreshCw, Flame, TrendingDown } from "lucide-react";
+import { marketApi } from "@/lib/api";
 
 export interface MarketOverviewProps {
   overview: any;
@@ -22,6 +24,45 @@ export const MarketOverview: React.FC<MarketOverviewProps> = ({
   onAnalyze,
   onSelectSymbol,
 }) => {
+  const [topRecs, setTopRecs] = useState<any[]>([]);
+  const [loadingRecs, setLoadingRecs] = useState(true);
+  const [scanningNow, setScanningNow] = useState(false);
+  const [lastScanned, setLastScanned] = useState<string | null>(null);
+
+  const fetchTopRecs = useCallback(async () => {
+    try {
+      setLoadingRecs(true);
+      const data = await marketApi.getTopRecommendations(20);
+      setTopRecs(data?.items || []);
+      if ((data?.items || []).length > 0) {
+        const ts = data.items[0]?.recommended_date;
+        if (ts) setLastScanned(new Date(ts).toLocaleString("vi-VN"));
+      }
+    } catch (err) {
+      console.error("Failed to fetch top recommendations:", err);
+      setTopRecs([]);
+    } finally {
+      setLoadingRecs(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTopRecs();
+  }, [fetchTopRecs]);
+
+  const handleTriggerScan = async () => {
+    if (scanningNow) return;
+    setScanningNow(true);
+    try {
+      await marketApi.triggerScan();
+      await fetchTopRecs();
+    } catch (err) {
+      console.error("Scan trigger failed:", err);
+    } finally {
+      setScanningNow(false);
+    }
+  };
+
   if (!overview) return null;
 
   return (
@@ -137,57 +178,146 @@ export const MarketOverview: React.FC<MarketOverviewProps> = ({
         </div>
       </div>
 
-      {/* Top BUY Recommendations card */}
+      {/* Top BUY Recommendations — Dynamic from scanner API */}
       <div className="bg-[#161B22] rounded-xl border border-[#30363D] p-5 shadow-sm">
-        <h3 className="text-sm font-semibold text-gray-200 mb-2 flex items-center space-x-2">
-          <Bot size={16} className="text-blue-400" />
-          <span>Top Cổ Phiếu Khuyến Nghị Mua (Thuật Toán Định Lượng)</span>
-        </h3>
-        <p className="text-xs text-gray-400 mb-4 leading-relaxed">
-          Được lọc tự động dựa trên giao thoa thuật toán: **Động lượng RSI quá bán (&lt; 40)**, **Dải dưới Bollinger Bands** và **Điểm Piotroski F-Score vững mạnh (&gt;= 6)** kết hợp **P/E rẻ**.
-        </p>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left text-gray-400">
-            <thead className="text-[10px] text-gray-500 uppercase tracking-wider bg-[#0D1117]/60 border-b border-[#30363D]">
-              <tr>
-                <th className="py-2.5 px-3">Mã CP</th>
-                <th className="py-2.5 px-3">Giá hiện tại</th>
-                <th className="py-2.5 px-3">Tín hiệu kỹ thuật (TA)</th>
-                <th className="py-2.5 px-3">Sức mạnh cơ bản (FA)</th>
-                <th className="py-2.5 px-3">Đánh giá</th>
-                <th className="py-2.5 px-3 text-right">Hành động</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#30363D]/40">
-              {[
-                { symbol: "HPG", price: "26,150", tech: "RSI=31.2, Tiệm cận BB Lower", fundamental: "P/E=6.5, F-Score=7/9", rating: "MUA MẠNH", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
-                { symbol: "VNM", price: "68,400", tech: "RSI=35.6, Phân kỳ dương", fundamental: "P/E=11.2, F-Score=8/9", rating: "MUA", color: "text-emerald-400 bg-emerald-500/5 border-emerald-500/10" },
-                { symbol: "CMG", price: "24,400", tech: "RSI=38.4, Vượt MA50", fundamental: "P/E=12.4, F-Score=7/9", rating: "MUA", color: "text-emerald-400 bg-emerald-500/5 border-emerald-500/10" },
-                { symbol: "TCB", price: "23,100", tech: "RSI=33.8, Co thắt Bollinger Bands", fundamental: "P/E=5.8, F-Score=6/9", rating: "MUA", color: "text-emerald-400 bg-emerald-500/5 border-emerald-500/10" },
-              ].map((rec) => (
-                <tr key={rec.symbol} className="hover:bg-[#21262D]/40 transition-colors">
-                  <td className="py-3 px-3 font-bold text-gray-200">{rec.symbol}</td>
-                  <td className="py-3 px-3 font-mono text-gray-300">{rec.price}</td>
-                  <td className="py-3 px-3 text-[11px] text-gray-400">{rec.tech}</td>
-                  <td className="py-3 px-3 text-[11px] text-gray-400">{rec.fundamental}</td>
-                  <td className="py-3 px-3">
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${rec.color}`}>
-                      {rec.rating}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-right">
-                    <button
-                      onClick={() => onSelectSymbol(rec.symbol)}
-                      className="px-2.5 py-1 bg-blue-600/15 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 rounded text-[10px] font-semibold transition-all"
-                    >
-                      Chi tiết
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-200 flex items-center gap-2">
+              <Bot size={16} className="text-blue-400" />
+              Top Cổ Phiếu Khuyến Nghị Mua (Thuật Toán Định Lượng)
+            </h3>
+            <p className="text-[11px] text-gray-500 mt-1">
+              Quét tự động toàn thị trường HOSE sau 15:30 ICT mỗi ngày dựa trên RSI quá bán · Bollinger Bands · MA Cross.
+              {lastScanned && <span className="ml-2 text-gray-600">Cập nhật lần cuối: {lastScanned}</span>}
+            </p>
+          </div>
+          <button
+            onClick={handleTriggerScan}
+            disabled={scanningNow || loadingRecs}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#21262D] hover:bg-[#30363D] border border-[#30363D] text-gray-300 text-[11px] font-semibold rounded-lg transition-all disabled:opacity-50"
+            title="Chạy quét thủ công ngay (mất ~10-15 phút)"
+          >
+            <RefreshCw size={12} className={scanningNow ? "animate-spin" : ""} />
+            {scanningNow ? "Đang quét..." : "Quét ngay"}
+          </button>
         </div>
+
+        {loadingRecs ? (
+          <div className="py-10 flex flex-col items-center justify-center gap-3 text-gray-500">
+            <RefreshCw size={22} className="animate-spin text-blue-400" />
+            <span className="text-xs">Đang tải dữ liệu từ database...</span>
+          </div>
+        ) : topRecs.length === 0 ? (
+          <div className="py-10 flex flex-col items-center justify-center gap-3 text-center text-gray-500">
+            <Bot size={28} className="text-gray-600" />
+            <p className="text-xs max-w-sm leading-relaxed">
+              Chưa có dữ liệu quét. Thuật toán sẽ tự động chạy lúc <strong className="text-gray-400">15:30 ICT</strong> sau khi thị trường đóng cửa.
+              <br />Hoặc bạn có thể nhấn <strong className="text-gray-400">"Quét ngay"</strong> để chạy thủ công.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left text-gray-400">
+              <thead className="text-[10px] text-gray-500 uppercase tracking-wider bg-[#0D1117]/60 border-b border-[#30363D]">
+                <tr>
+                  <th className="py-2.5 px-3">Mã CP</th>
+                  <th className="py-2.5 px-3">Giá</th>
+                  <th className="py-2.5 px-3">RSI(14)</th>
+                  <th className="py-2.5 px-3">Lý do lọc</th>
+                  <th className="py-2.5 px-3 text-center">Streak FOMO</th>
+                  <th className="py-2.5 px-3 text-center">Điểm TA</th>
+                  <th className="py-2.5 px-3 text-center">Đánh giá</th>
+                  <th className="py-2.5 px-3 text-right">Chi tiết</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#30363D]/40">
+                {topRecs.map((rec) => {
+                  const isMuaManh = rec.rating === "MUA MẠNH";
+                  const ratingColor = isMuaManh
+                    ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                    : "text-emerald-400 bg-emerald-500/5 border-emerald-500/10";
+                  const isHighFomo = rec.days_in_top >= 3;
+                  const isVeryHighFomo = rec.days_in_top >= 5;
+
+                  return (
+                    <tr key={rec.symbol} className="hover:bg-[#21262D]/40 transition-colors">
+                      <td className="py-3 px-3">
+                        <div className="font-bold text-gray-200">{rec.symbol}</div>
+                        <div className="text-[10px] text-gray-500">{rec.exchange}</div>
+                      </td>
+                      <td className="py-3 px-3 font-mono text-gray-300 tabular-nums">
+                        {rec.price ? rec.price.toLocaleString("vi-VN") : "--"}
+                      </td>
+                      <td className="py-3 px-3">
+                        {rec.rsi != null ? (
+                          <span
+                            className={`font-mono font-semibold ${
+                              rec.rsi < 30
+                                ? "text-emerald-300"
+                                : rec.rsi < 40
+                                ? "text-emerald-400"
+                                : "text-gray-400"
+                            }`}
+                          >
+                            {rec.rsi.toFixed(1)}
+                          </span>
+                        ) : (
+                          "--"
+                        )}
+                      </td>
+                      <td className="py-3 px-3 max-w-[220px]">
+                        <p className="text-[11px] text-gray-400 leading-snug line-clamp-2" title={rec.reason}>
+                          {rec.reason}
+                        </p>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <span
+                          className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                            isVeryHighFomo
+                              ? "text-orange-300 bg-orange-500/10 border-orange-500/25"
+                              : isHighFomo
+                              ? "text-amber-400 bg-amber-500/10 border-amber-500/25"
+                              : "text-gray-500 bg-transparent border-transparent"
+                          }`}
+                        >
+                          {isHighFomo && <Flame size={9} />}
+                          {rec.days_in_top} ngày
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <div className="flex items-center justify-center gap-0.5">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <div
+                              key={i}
+                              className={`w-1.5 h-3 rounded-sm ${
+                                i < rec.tech_score
+                                  ? "bg-emerald-400"
+                                  : "bg-[#30363D]"
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded border ${ratingColor}`}>
+                          {rec.rating}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <button
+                          onClick={() => onSelectSymbol(rec.symbol)}
+                          className="px-2.5 py-1 bg-blue-600/15 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/30 rounded text-[10px] font-semibold transition-all"
+                        >
+                          Xem →
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

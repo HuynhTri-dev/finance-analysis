@@ -31,7 +31,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.infra.database import async_session_maker, engine
 from sqlalchemy import text
 from app.routers import analyze_router, market_router, news_router, watchlist_router, report_router
-from app.services import news_service
+from app.services import news_service, scanner_service
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -112,6 +112,13 @@ async def _run_crawl_job() -> None:
     logger.info("Crawl complete: %d macro + %d watchlist articles inserted.", macro_count, watchlist_count)
 
 
+async def _run_scanner_job() -> None:
+    """Scheduled task: run nightly full-market quantitative scan."""
+    logger.info("Nightly market scanner job triggered.")
+    summary = await scanner_service.run_market_scan()
+    logger.info("Scanner job complete: %s", summary)
+
+
 @app.on_event("startup")
 async def on_startup() -> None:
     """Register cron jobs on app startup."""
@@ -123,14 +130,29 @@ async def on_startup() -> None:
     except Exception as e:
         logger.warning("Database migration check failed: %s", e)
 
+    # Auto-create top_recommendation table if it doesn't exist
+    try:
+        from app.models import Base
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database bootstrap: all tables verified/created.")
+    except Exception as e:
+        logger.warning("Database table bootstrap failed: %s", e)
+
     # Morning crawl — 08:00 ICT
     scheduler.add_job(_run_crawl_job, CronTrigger(hour=1, minute=0, timezone="UTC"), id="crawl_morning")
     # Midday crawl — 11:30 ICT
     scheduler.add_job(_run_crawl_job, CronTrigger(hour=4, minute=30, timezone="UTC"), id="crawl_midday")
     # Close crawl — 16:30 ICT
     scheduler.add_job(_run_crawl_job, CronTrigger(hour=9, minute=30, timezone="UTC"), id="crawl_close")
+    # Nightly market scanner — 15:30 ICT (08:30 UTC) — after market close
+    scheduler.add_job(
+        _run_scanner_job,
+        CronTrigger(hour=8, minute=30, timezone="UTC"),
+        id="scanner_nightly",
+    )
     scheduler.start()
-    logger.info("APScheduler started with 3 daily crawl jobs (08:00 / 11:30 / 16:30 ICT).")
+    logger.info("APScheduler started with 3 crawl jobs + 1 nightly market scanner (15:30 ICT).")
 
 
 @app.on_event("shutdown")

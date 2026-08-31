@@ -28,6 +28,14 @@ export const marketApi = {
     });
     return response.data;
   },
+  getTopRecommendations: async (limit = 20) => {
+    const response = await apiClient.get('/market/top-recommendations', { params: { limit } });
+    return response.data;
+  },
+  triggerScan: async () => {
+    const response = await apiClient.post('/market/scan-top');
+    return response.data;
+  },
 };
 
 export const watchlistApi = {
