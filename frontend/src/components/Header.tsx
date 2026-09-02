@@ -8,7 +8,7 @@
 
 import React, { useEffect, useState } from "react";
 import { format } from "date-fns";
-import { PanelLeftOpen, PanelRightClose, PanelRightOpen, Bot } from "lucide-react";
+import { PanelLeftOpen, PanelRightClose, PanelRightOpen, Bot, User as UserIcon, LogOut } from "lucide-react";
 
 export interface HeaderProps {
   isLeftSidebarOpen: boolean;
@@ -18,6 +18,8 @@ export interface HeaderProps {
   activeSymbol: string | null;
   pdfCount: number;
   isAnalyzing: boolean;
+  currentUser?: any;
+  onLogout?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -28,6 +30,8 @@ export const Header: React.FC<HeaderProps> = ({
   activeSymbol,
   pdfCount,
   isAnalyzing,
+  currentUser,
+  onLogout,
 }) => {
   const [currentDate, setCurrentDate] = useState<string>("");
 
@@ -60,8 +64,8 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Right Header Actions */}
-      <div className="flex items-center space-x-3 flex-shrink-0">
-        <div className="text-xs text-gray-400 hidden lg:block">
+      <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
+        <div className="text-xs text-gray-400 hidden xl:block">
           {currentDate}
         </div>
 
@@ -79,7 +83,7 @@ export const Header: React.FC<HeaderProps> = ({
             size={15}
             className={isAnalyzing ? "text-emerald-400 animate-spin" : "text-blue-400"}
           />
-          <span>Trợ Lý AI & PDF</span>
+          <span className="hidden sm:inline">Trợ Lý AI & PDF</span>
           {pdfCount > 0 && (
             <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-blue-600 text-white font-bold">
               {pdfCount}
@@ -91,7 +95,29 @@ export const Header: React.FC<HeaderProps> = ({
             <PanelRightOpen size={14} className="hidden sm:inline opacity-70" />
           )}
         </button>
+
+        {/* Logged in User Profile & Logout */}
+        {currentUser && (
+          <div className="flex items-center space-x-1.5 pl-2 border-l border-[#30363D]">
+            <div className="flex items-center space-x-1.5 px-2.5 py-1 bg-[#21262D] border border-[#30363D] rounded-lg">
+              <UserIcon size={13} className="text-emerald-400" />
+              <span className="text-xs font-semibold text-gray-200 max-w-[100px] truncate" title={currentUser.full_name || currentUser.username}>
+                {currentUser.full_name || currentUser.username}
+              </span>
+            </div>
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="p-1.5 text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors border border-transparent hover:border-rose-500/20"
+                title="Đăng xuất khỏi hệ thống"
+              >
+                <LogOut size={15} />
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </header>
   );
 };
+

@@ -17,6 +17,7 @@ import {
 } from "@/lib/api";
 import {
   LoadingScreen,
+  LoginScreen,
   LeftSidebar,
   Header,
   MarketOverview,
@@ -117,6 +118,10 @@ export default function Home() {
   const [loadingPdfs, setLoadingPdfs] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
+  // User Authentication State
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
+
   // Layout sidebar collapsible states
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);
@@ -126,6 +131,17 @@ export default function Home() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
+      // Check local storage for authenticated user session
+      const savedUser = localStorage.getItem("finance_auth_user");
+      if (savedUser) {
+        try {
+          setCurrentUser(JSON.parse(savedUser));
+        } catch (e) {
+          console.error("Error parsing auth user session:", e);
+        }
+      }
+      setIsAuthChecking(false);
+
       const saved = localStorage.getItem("finance_holdings");
       if (saved) {
         try {
@@ -136,6 +152,20 @@ export default function Home() {
       }
     }
   }, []);
+
+  const handleLoginSuccess = (user: any) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("finance_auth_user", JSON.stringify(user));
+    }
+    setCurrentUser(user);
+  };
+
+  const handleLogout = () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("finance_auth_user");
+    }
+    setCurrentUser(null);
+  };
 
   const handleToggleHolding = async (symbol: string) => {
     try {
@@ -423,8 +453,12 @@ export default function Home() {
     }
   };
 
-  if (loading) {
+  if (isAuthChecking || (currentUser && loading)) {
     return <LoadingScreen />;
+  }
+
+  if (!currentUser) {
+    return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
   }
 
   const quote = symbolDetail?.quote || {};
@@ -465,6 +499,8 @@ export default function Home() {
           activeSymbol={activeSymbol}
           pdfCount={pdfReports.length}
           isAnalyzing={isAnalyzing}
+          currentUser={currentUser}
+          onLogout={handleLogout}
         />
 
         {/* Main Content Area */}

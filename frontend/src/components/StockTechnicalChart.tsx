@@ -104,27 +104,24 @@ export const StockTechnicalChart: React.FC<StockTechnicalChartProps> = ({
         <div className="flex items-center space-x-3">
           <div className="flex items-center space-x-1.5 text-xs font-semibold text-gray-200">
             <BarChart3 size={16} className="text-blue-400" />
-            <span>Biểu Đồ Kỹ Thuật (OHLCV & RSI Indicators)</span>
           </div>
 
           <button
             onClick={onToggleMAs}
-            className={`text-[11px] px-2 py-0.5 rounded border transition-colors ${
-              showMAs
+            className={`text-[11px] px-2 py-0.5 rounded border transition-colors ${showMAs
                 ? "bg-blue-500/20 text-blue-400 border-blue-500/40"
                 : "bg-[#21262D] text-gray-400 border-[#30363D]"
-            }`}
+              }`}
           >
             MA20 / MA50
           </button>
 
           <button
             onClick={() => setShowBB(!showBB)}
-            className={`text-[11px] px-2 py-0.5 rounded border transition-colors ${
-              showBB
+            className={`text-[11px] px-2 py-0.5 rounded border transition-colors ${showBB
                 ? "bg-blue-500/20 text-blue-400 border-blue-500/40"
                 : "bg-[#21262D] text-gray-400 border-[#30363D]"
-            }`}
+              }`}
           >
             Dải Bollinger
           </button>
@@ -136,11 +133,10 @@ export const StockTechnicalChart: React.FC<StockTechnicalChartProps> = ({
             <button
               key={tf}
               onClick={() => onTimeframeChange(tf)}
-              className={`px-2.5 sm:px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                selectedTimeframe === tf
+              className={`px-2.5 sm:px-3 py-1 text-xs font-semibold rounded-md transition-all ${selectedTimeframe === tf
                   ? "bg-blue-600 text-white shadow"
                   : "text-gray-400 hover:text-gray-200 hover:bg-[#21262D]"
-              }`}
+                }`}
             >
               {tf}
             </button>
@@ -161,7 +157,7 @@ export const StockTechnicalChart: React.FC<StockTechnicalChartProps> = ({
               <ComposedChart
                 data={chartRecords}
                 syncId="stockChart"
-                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                margin={{ top: 10, right: 35, left: 5, bottom: 0 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#21262D" vertical={false} />
                 <XAxis
@@ -170,9 +166,12 @@ export const StockTechnicalChart: React.FC<StockTechnicalChartProps> = ({
                 />
                 <YAxis
                   yAxisId="price"
+                  orientation="right"
                   domain={["auto", "auto"]}
                   stroke="#6E7681"
-                  tick={{ fontSize: 11 }}
+                  tick={{ fontSize: 11, fill: "#9CA3AF" }}
+                  axisLine={{ stroke: "#30363D" }}
+                  tickLine={{ stroke: "#30363D" }}
                   tickFormatter={(val) => (val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val)}
                 />
                 <YAxis yAxisId="vol" orientation="right" domain={[0, "dataMax * 3.5"]} hide />
@@ -236,6 +235,23 @@ export const StockTechnicalChart: React.FC<StockTechnicalChartProps> = ({
                     return null;
                   }}
                 />
+
+                {/* Current Price Dashed Reference Line */}
+                {chartRecords[chartRecords.length - 1]?.close !== undefined && (
+                  <ReferenceLine
+                    yAxisId="price"
+                    y={chartRecords[chartRecords.length - 1].close}
+                    stroke={
+                      (chartRecords[chartRecords.length - 1].close >=
+                        (chartRecords[chartRecords.length - 1].open || 0))
+                        ? "#22c55e"
+                        : "#ef4444"
+                    }
+                    strokeDasharray="2 2"
+                    strokeWidth={1}
+                    opacity={0.8}
+                  />
+                )}
 
                 {/* Volume Bar */}
                 <Bar
@@ -324,7 +340,7 @@ export const StockTechnicalChart: React.FC<StockTechnicalChartProps> = ({
               <ComposedChart
                 data={chartRecords}
                 syncId="stockChart"
-                margin={{ top: 5, right: 10, left: -20, bottom: 5 }}
+                margin={{ top: 5, right: 35, left: 5, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#21262D" vertical={false} />
                 <XAxis
@@ -342,10 +358,13 @@ export const StockTechnicalChart: React.FC<StockTechnicalChartProps> = ({
                 />
                 <YAxis
                   yAxisId="rsiAxis"
+                  orientation="right"
                   domain={[0, 100]}
                   ticks={[30, 50, 70]}
                   stroke="#6E7681"
-                  tick={{ fontSize: 9 }}
+                  tick={{ fontSize: 9, fill: "#9CA3AF" }}
+                  axisLine={{ stroke: "#30363D" }}
+                  tickLine={{ stroke: "#30363D" }}
                 />
 
                 {/* Boundaries Reference Lines for Overbought (70) and Oversold (30) */}

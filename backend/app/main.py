@@ -29,8 +29,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 
 from app.infra.database import async_session_maker, engine
-from sqlalchemy import text
-from app.routers import analyze_router, market_router, news_router, watchlist_router, report_router
+from sqlalchemy import text, select
+from app.routers import analyze_router, auth_router, market_router, news_router, watchlist_router, report_router
 from app.services import news_service, scanner_service
 
 # ---------------------------------------------------------------------------
@@ -89,6 +89,7 @@ app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 # ---------------------------------------------------------------------------
 # Routers
 # ---------------------------------------------------------------------------
+app.include_router(auth_router.router)
 app.include_router(market_router.router)
 app.include_router(news_router.router)
 app.include_router(analyze_router.router)
@@ -121,7 +122,7 @@ async def _run_scanner_job() -> None:
 
 @app.on_event("startup")
 async def on_startup() -> None:
-    """Register cron jobs on app startup."""
+    """Register cron jobs and bootstrap database schema/users on app startup."""
     # Auto migrate Watchlist table by adding 'is_holding' if not exists
     try:
         async with engine.begin() as conn:
@@ -130,14 +131,33 @@ async def on_startup() -> None:
     except Exception as e:
         logger.warning("Database migration check failed: %s", e)
 
-    # Auto-create top_recommendation table if it doesn't exist
+    # Auto-create all tables (including users) if they don't exist
     try:
-        from app.models import Base
+        from app.models import Base, User
+        from app.core.security import hash_password
+
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         logger.info("Database bootstrap: all tables verified/created.")
+
+        # Seed default admin user if none exists
+        async with async_session_maker() as session:
+            stmt = select(User).limit(1)
+            res = await session.execute(stmt)
+            existing_user = res.scalar_one_or_none()
+            if not existing_user:
+                default_user = User(
+                    username="admin",
+                    hashed_password=hash_password("admin"),
+                    full_name="Quản Trị Viên",
+                    is_active=True,
+                )
+                session.add(default_user)
+                await session.commit()
+                logger.info("Database bootstrap: Seeded default admin user (admin/admin).")
     except Exception as e:
-        logger.warning("Database table bootstrap failed: %s", e)
+        logger.warning("Database table/user bootstrap failed: %s", e)
+
 
     # Morning crawl — 08:00 ICT
     scheduler.add_job(_run_crawl_job, CronTrigger(hour=1, minute=0, timezone="UTC"), id="crawl_morning")

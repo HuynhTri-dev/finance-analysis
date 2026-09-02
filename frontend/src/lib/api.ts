@@ -10,6 +10,13 @@ export const apiClient = axios.create({
   },
 });
 
+export const authApi = {
+  login: async (username: string, password: string) => {
+    const response = await apiClient.post('/auth/login', { username, password });
+    return response.data;
+  },
+};
+
 export const marketApi = {
   getOverview: async () => {
     const response = await apiClient.get('/market/overview');

@@ -74,10 +74,23 @@ export const MarketOverview: React.FC<MarketOverviewProps> = ({
           return (
             <div
               key={idx.symbol}
-              className="p-4 rounded-xl bg-[#161B22] border border-[#30363D] shadow-sm hover:border-gray-600 transition-all"
+              className="p-4 rounded-xl bg-[#161B22] border border-[#30363D] shadow-sm hover:border-gray-600 transition-all flex flex-col justify-between"
             >
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-bold text-gray-200">{idx.symbol}</span>
+              <div className="text-sm font-bold text-gray-200 mb-1">
+                {idx.symbol}
+              </div>
+              <div className="text-2xl font-bold text-gray-100">
+                {idx.close ? idx.close.toLocaleString() : "--"}
+              </div>
+              <div className="mt-2.5 flex flex-col gap-1.5 items-start">
+                <div
+                  className={`text-xs font-medium ${
+                    isPositive ? "text-emerald-400" : "text-rose-400"
+                  } flex items-center`}
+                >
+                  {isPositive ? "+" : ""}
+                  {idx.change || 0} điểm
+                </div>
                 <span
                   className={`text-xs font-semibold px-2 py-0.5 rounded-md border ${
                     isPositive
@@ -87,17 +100,6 @@ export const MarketOverview: React.FC<MarketOverviewProps> = ({
                 >
                   {idx.change_pct !== null ? `${isPositive ? "+" : ""}${idx.change_pct}%` : "N/A"}
                 </span>
-              </div>
-              <div className="text-2xl font-bold text-gray-100">
-                {idx.close ? idx.close.toLocaleString() : "--"}
-              </div>
-              <div
-                className={`text-xs ${
-                  isPositive ? "text-emerald-400" : "text-rose-400"
-                } flex items-center mt-1`}
-              >
-                {isPositive ? "+" : ""}
-                {idx.change || 0} điểm
               </div>
             </div>
           );

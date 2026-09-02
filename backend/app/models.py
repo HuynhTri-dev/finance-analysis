@@ -286,3 +286,49 @@ class TopRecommendation(Base):
         nullable=True,
         doc="Trading volume at time of scan.",
     )
+
+
+class User(Base):
+    """
+    User entity for dashboard access authentication.
+    Accounts are managed directly via database / seed scripts.
+    """
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid4()),
+        doc="UUID string uniquely identifying the user.",
+    )
+    username: Mapped[str] = mapped_column(
+        String(50),
+        unique=True,
+        index=True,
+        nullable=False,
+        doc="Unique login username.",
+    )
+    hashed_password: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        doc="Hashed password string (PBKDF2/SHA256 with salt).",
+    )
+    full_name: Mapped[str] = mapped_column(
+        String(100),
+        default="Administrator",
+        nullable=False,
+        doc="Display name of the user.",
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        nullable=False,
+        doc="Active status flag.",
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_utc_now,
+        nullable=False,
+        doc="Timestamp of account creation.",
+    )
+
