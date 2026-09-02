@@ -332,3 +332,43 @@ class User(Base):
         doc="Timestamp of account creation.",
     )
 
+
+class RiskAnalysisCache(Base):
+    """
+    Cache for risk analysis results (Technical Risk & Fundamental F-Score)
+    to save database compute and 3rd party API calls.
+    """
+    __tablename__ = "risk_analysis_cache"
+
+    symbol: Mapped[str] = mapped_column(
+        String(20),
+        primary_key=True,
+        index=True,
+        doc="Stock ticker symbol.",
+    )
+    as_of_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_utc_now,
+        doc="Timestamp when this analysis was generated.",
+    )
+    
+    f_score: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+        doc="Piotroski F-Score (0-9).",
+    )
+    
+    buy_score: Mapped[int] = mapped_column(
+        Integer,
+        doc="Calculated BUY_RISK score (0-100).",
+    )
+    sell_score: Mapped[int] = mapped_column(
+        Integer,
+        doc="Calculated SELL_RISK score (0-100).",
+    )
+    
+    result_json: Mapped[str] = mapped_column(
+        Text,
+        doc="Full JSON string of the risk scoring result for fast retrieval.",
+    )
+
