@@ -1,15 +1,15 @@
 /**
  * @file StockTechnicalChart.tsx
  * @description Advanced financial technical analysis chart utilizing Recharts.
- * Renders high-performance Japanese Candlestick (OHLC) bars, volume overlays,
- * MA20/MA50 overlays, and a synced secondary RSI (Relative Strength Index) line chart pane.
+ * Features cursor-anchored zoom & trackpad horizontal pan, granular price step axes (0.5k / 1.0k),
+ * high-performance Japanese Candlesticks, volume overlays, MA20/MA50 overlays, and a synced RSI pane.
  */
 
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { format } from "date-fns";
-import { BarChart3, RefreshCw, TrendingUp } from "lucide-react";
+import { BarChart3, RefreshCw, ZoomIn, ZoomOut, RotateCcw, TrendingUp } from "lucide-react";
 import {
   ComposedChart,
   Line,
@@ -97,11 +97,239 @@ export const StockTechnicalChart: React.FC<StockTechnicalChartProps> = ({
   onToggleMAs,
 }) => {
   const [showBB, setShowBB] = useState<boolean>(false);
+  const [viewRange, setViewRange] = useState<{ start: number; end: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
+  const dragStartXRef = useRef(0);
+  const dragRangeStartRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
+
+  // Reset zoom view range whenever timeframe or symbol data changes
+  useEffect(() => {
+    setViewRange(null);
+  }, [selectedTimeframe, chartRecords]);
+
+  const totalLen = chartRecords?.length || 0;
+  const currentStart = viewRange ? viewRange.start : 0;
+  const currentEnd = viewRange ? viewRange.end : totalLen;
+  const currentLen = Math.max(1, currentEnd - currentStart);
+
+  // Sliced data currently in viewport
+  const visibleRecords = useMemo(() => {
+    if (!chartRecords || chartRecords.length === 0) return [];
+    return chartRecords.slice(currentStart, currentEnd);
+  }, [chartRecords, currentStart, currentEnd]);
+
+  const isZoomed = viewRange !== null && (viewRange.start > 0 || viewRange.end < totalLen);
+
+  /**
+   * Smart Price Ticks generator for Y-Axis with clean 0.5k / 1.0k / 2.0k intervals
+   */
+  const { priceTicks, priceDomain } = useMemo(() => {
+    if (!visibleRecords || visibleRecords.length === 0) {
+      return { priceTicks: undefined, priceDomain: ["auto", "auto"] as [any, any] };
+    }
+
+    const prices: number[] = [];
+    visibleRecords.forEach((r) => {
+      if (typeof r.low === "number" && !isNaN(r.low)) prices.push(r.low);
+      if (typeof r.high === "number" && !isNaN(r.high)) prices.push(r.high);
+      if (typeof r.open === "number" && !isNaN(r.open)) prices.push(r.open);
+      if (typeof r.close === "number" && !isNaN(r.close)) prices.push(r.close);
+      if (showMAs) {
+        if (typeof r.ma20 === "number" && !isNaN(r.ma20)) prices.push(r.ma20);
+        if (typeof r.ma50 === "number" && !isNaN(r.ma50)) prices.push(r.ma50);
+      }
+      if (showBB) {
+        if (typeof r.bb_lower === "number" && !isNaN(r.bb_lower)) prices.push(r.bb_lower);
+        if (typeof r.bb_upper === "number" && !isNaN(r.bb_upper)) prices.push(r.bb_upper);
+      }
+    });
+
+    if (prices.length === 0) {
+      return { priceTicks: undefined, priceDomain: ["auto", "auto"] as [any, any] };
+    }
+
+    const minP = Math.min(...prices);
+    const maxP = Math.max(...prices);
+    const diff = maxP - minP;
+
+    // Pick granular step based on price level & range (in VND or thousands)
+    let step = 1000;
+    if (minP > 500) {
+      // Prices in raw VND (e.g. 72,000)
+      if (diff <= 1500) step = 200;
+      else if (diff <= 3500) step = 500;
+      else if (diff <= 8000) step = 1000;
+      else if (diff <= 20000) step = 2000;
+      else if (diff <= 50000) step = 5000;
+      else step = 10000;
+    } else {
+      // Prices in thousands (e.g. 72.0)
+      if (diff <= 1.5) step = 0.2;
+      else if (diff <= 3.5) step = 0.5;
+      else if (diff <= 8.0) step = 1.0;
+      else if (diff <= 20.0) step = 2.0;
+      else step = 5.0;
+    }
+
+    const startTick = Math.floor(minP / step) * step;
+    const endTick = Math.ceil(maxP / step) * step;
+    const ticks: number[] = [];
+    for (let t = startTick; t <= endTick + step * 0.01; t += step) {
+      ticks.push(Number(t.toFixed(2)));
+    }
+
+    return {
+      priceTicks: ticks,
+      priceDomain: [startTick, endTick] as [number, number],
+    };
+  }, [visibleRecords, showMAs, showBB]);
+
+  /**
+   * Zooms in anchored to center
+   */
+  const handleZoomIn = () => {
+    if (totalLen <= 6) return;
+    const newLen = Math.max(8, Math.round(currentLen * 0.8));
+    const pivot = currentStart + currentLen / 2;
+    let newStart = Math.max(0, Math.round(pivot - newLen / 2));
+    let newEnd = newStart + newLen;
+    if (newEnd > totalLen) {
+      newStart = Math.max(0, totalLen - newLen);
+      newEnd = totalLen;
+    }
+    setViewRange({ start: newStart, end: newEnd });
+  };
+
+  /**
+   * Zooms out anchored to center
+   */
+  const handleZoomOut = () => {
+    if (totalLen <= 6) return;
+    const newLen = Math.round(currentLen * 1.25);
+    if (newLen >= totalLen) {
+      setViewRange(null);
+      return;
+    }
+    const pivot = currentStart + currentLen / 2;
+    let newStart = Math.max(0, Math.round(pivot - newLen / 2));
+    let newEnd = newStart + newLen;
+    if (newEnd > totalLen) {
+      newStart = Math.max(0, totalLen - newLen);
+      newEnd = totalLen;
+    }
+    setViewRange({ start: newStart, end: newEnd });
+  };
+
+  /**
+   * Resets zoom to full view
+   */
+  const handleResetZoom = () => {
+    setViewRange(null);
+  };
+
+  /**
+   * Cursor-anchored Wheel zoom & 2-finger Trackpad swipe pan
+   */
+  const handleWheel = (e: React.WheelEvent) => {
+    if (!containerRef.current || totalLen <= 6) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const ratio = Math.max(0.02, Math.min(0.98, mouseX / rect.width));
+
+    // Horizontal 2-finger swipe on trackpad -> Pan
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 2) {
+      const panDelta = Math.round((e.deltaX / rect.width) * currentLen * 0.8);
+      if (panDelta !== 0) {
+        let newStart = currentStart + panDelta;
+        let newEnd = currentEnd + panDelta;
+        if (newStart < 0) {
+          newEnd -= newStart;
+          newStart = 0;
+        }
+        if (newEnd > totalLen) {
+          newStart -= newEnd - totalLen;
+          newEnd = totalLen;
+          newStart = Math.max(0, newStart);
+        }
+        setViewRange({ start: newStart, end: newEnd });
+      }
+      return;
+    }
+
+    // Vertical wheel / Pinch -> Zoom anchored at cursor position
+    if (Math.abs(e.deltaY) > 2) {
+      const zoomFactor = e.deltaY < 0 ? 0.82 : 1.22;
+      const newLen = Math.round(currentLen * zoomFactor);
+      const minLen = 8;
+      const clampedLen = Math.max(minLen, Math.min(totalLen, newLen));
+
+      if (clampedLen >= totalLen) {
+        setViewRange(null);
+        return;
+      }
+
+      const pivotIndex = currentStart + ratio * currentLen;
+      let newStart = Math.round(pivotIndex - ratio * clampedLen);
+      let newEnd = newStart + clampedLen;
+
+      if (newStart < 0) {
+        newEnd -= newStart;
+        newStart = 0;
+      }
+      if (newEnd > totalLen) {
+        newStart -= newEnd - totalLen;
+        newEnd = totalLen;
+        newStart = Math.max(0, newStart);
+      }
+
+      setViewRange({ start: newStart, end: newEnd });
+    }
+  };
+
+  /**
+   * Drag to pan handlers
+   */
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0 || totalLen <= 6) return;
+    isDraggingRef.current = true;
+    dragStartXRef.current = e.clientX;
+    dragRangeStartRef.current = { start: currentStart, end: currentEnd };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDraggingRef.current || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const deltaX = e.clientX - dragStartXRef.current;
+    const shift = Math.round((deltaX / rect.width) * currentLen);
+
+    if (shift !== 0) {
+      const orig = dragRangeStartRef.current;
+      let newStart = orig.start - shift;
+      let newEnd = orig.end - shift;
+      if (newStart < 0) {
+        newEnd -= newStart;
+        newStart = 0;
+      }
+      if (newEnd > totalLen) {
+        newStart -= newEnd - totalLen;
+        newEnd = totalLen;
+        newStart = Math.max(0, newStart);
+      }
+      setViewRange({ start: newStart, end: newEnd });
+    }
+  };
+
+  const handleMouseUp = () => {
+    isDraggingRef.current = false;
+  };
+
   return (
-    <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-4 sm:p-5 shadow-sm space-y-4">
+    <div className="bg-[#161B22] border border-[#30363D] rounded-xl p-4 sm:p-5 shadow-sm space-y-4 select-none">
       {/* Header controls bar */}
       <div className="flex flex-wrap items-center justify-between pb-3 border-b border-[#30363D]/80 gap-3">
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3">
           <div className="flex items-center space-x-1.5 text-xs font-semibold text-gray-200">
             <BarChart3 size={16} className="text-blue-400" />
           </div>
@@ -109,8 +337,8 @@ export const StockTechnicalChart: React.FC<StockTechnicalChartProps> = ({
           <button
             onClick={onToggleMAs}
             className={`text-[11px] px-2 py-0.5 rounded border transition-colors ${showMAs
-                ? "bg-blue-500/20 text-blue-400 border-blue-500/40"
-                : "bg-[#21262D] text-gray-400 border-[#30363D]"
+              ? "bg-blue-500/20 text-blue-400 border-blue-500/40"
+              : "bg-[#21262D] text-gray-400 border-[#30363D]"
               }`}
           >
             MA20 / MA50
@@ -119,28 +347,59 @@ export const StockTechnicalChart: React.FC<StockTechnicalChartProps> = ({
           <button
             onClick={() => setShowBB(!showBB)}
             className={`text-[11px] px-2 py-0.5 rounded border transition-colors ${showBB
-                ? "bg-blue-500/20 text-blue-400 border-blue-500/40"
-                : "bg-[#21262D] text-gray-400 border-[#30363D]"
+              ? "bg-blue-500/20 text-blue-400 border-blue-500/40"
+              : "bg-[#21262D] text-gray-400 border-[#30363D]"
               }`}
           >
             Dải Bollinger
           </button>
         </div>
 
-        {/* Timeframe Buttons */}
-        <div className="flex items-center space-x-1 bg-[#0D1117] p-1 rounded-lg border border-[#30363D]">
-          {["1M", "3M", "6M", "1Y"].map((tf) => (
+        <div className="flex items-center space-x-2">
+          {/* Zoom Controls & Status */}
+          <div className="flex items-center space-x-1 bg-[#0D1117] p-1 rounded-lg border border-[#30363D]">
             <button
-              key={tf}
-              onClick={() => onTimeframeChange(tf)}
-              className={`px-2.5 sm:px-3 py-1 text-xs font-semibold rounded-md transition-all ${selectedTimeframe === tf
-                  ? "bg-blue-600 text-white shadow"
-                  : "text-gray-400 hover:text-gray-200 hover:bg-[#21262D]"
+              onClick={handleZoomIn}
+              title="Phóng to (Cuộn chuột lên tại vị trí trỏ chuột)"
+              className="p-1 text-gray-400 hover:text-blue-400 hover:bg-[#21262D] rounded transition-colors"
+            >
+              <ZoomIn size={14} />
+            </button>
+            <button
+              onClick={handleZoomOut}
+              title="Thu nhỏ (Cuộn chuột xuống)"
+              className="p-1 text-gray-400 hover:text-blue-400 hover:bg-[#21262D] rounded transition-colors"
+            >
+              <ZoomOut size={14} />
+            </button>
+            <button
+              onClick={handleResetZoom}
+              title={isZoomed ? "Đặt lại khung nhìn mặc định" : "Khung nhìn 100%"}
+              disabled={!isZoomed}
+              className={`p-1 rounded transition-colors ${isZoomed
+                ? "text-amber-400 hover:bg-[#21262D]"
+                : "text-gray-600 cursor-not-allowed"
                 }`}
             >
-              {tf}
+              <RotateCcw size={14} />
             </button>
-          ))}
+          </div>
+
+          {/* Timeframe Buttons */}
+          <div className="flex items-center space-x-1 bg-[#0D1117] p-1 rounded-lg border border-[#30363D]">
+            {["1M", "3M", "6M", "1Y", "3Y"].map((tf) => (
+              <button
+                key={tf}
+                onClick={() => onTimeframeChange(tf)}
+                className={`px-2.5 sm:px-3 py-1 text-xs font-semibold rounded-md transition-all ${selectedTimeframe === tf
+                  ? "bg-blue-600 text-white shadow"
+                  : "text-gray-400 hover:text-gray-200 hover:bg-[#21262D]"
+                  }`}
+              >
+                {tf}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -150,31 +409,48 @@ export const StockTechnicalChart: React.FC<StockTechnicalChartProps> = ({
           Đang cập nhật biểu đồ...
         </div>
       ) : chartRecords && chartRecords.length > 0 ? (
-        <div className="space-y-4">
+        <div
+          ref={containerRef}
+          className="space-y-3 cursor-crosshair"
+          onWheel={handleWheel}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+        >
           {/* Pane 1: Candlestick Price + MA + Volume Chart */}
-          <div className="h-[250px] w-full">
+          <div className="h-[330px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
-                data={chartRecords}
+                data={visibleRecords}
                 syncId="stockChart"
-                margin={{ top: 10, right: 35, left: 5, bottom: 0 }}
+                margin={{ top: 10, right: 0, left: 0, bottom: 0 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#21262D" vertical={false} />
                 <XAxis
                   dataKey="time"
                   hide
+                  padding={{ left: 10, right: 10 }}
                 />
                 <YAxis
                   yAxisId="price"
                   orientation="right"
-                  domain={["auto", "auto"]}
+                  domain={priceDomain}
+                  ticks={priceTicks}
                   stroke="#6E7681"
                   tick={{ fontSize: 11, fill: "#9CA3AF" }}
                   axisLine={{ stroke: "#30363D" }}
                   tickLine={{ stroke: "#30363D" }}
-                  tickFormatter={(val) => (val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val)}
+                  width={52}
+                  tickFormatter={(val) => {
+                    if (val >= 1000) {
+                      const inK = val / 1000;
+                      return inK % 1 === 0 ? `${inK}` : `${inK.toFixed(1)}`;
+                    }
+                    return val % 1 === 0 ? `${val}` : `${val.toFixed(1)}`;
+                  }}
                 />
-                <YAxis yAxisId="vol" orientation="right" domain={[0, "dataMax * 3.5"]} hide />
+                <YAxis yAxisId="vol" orientation="right" domain={[0, "dataMax * 3.5"]} hide width={0} />
 
                 <Tooltip
                   content={({ active, payload, label }) => {
@@ -237,13 +513,13 @@ export const StockTechnicalChart: React.FC<StockTechnicalChartProps> = ({
                 />
 
                 {/* Current Price Dashed Reference Line */}
-                {chartRecords[chartRecords.length - 1]?.close !== undefined && (
+                {visibleRecords[visibleRecords.length - 1]?.close !== undefined && (
                   <ReferenceLine
                     yAxisId="price"
-                    y={chartRecords[chartRecords.length - 1].close}
+                    y={visibleRecords[visibleRecords.length - 1].close}
                     stroke={
-                      (chartRecords[chartRecords.length - 1].close >=
-                        (chartRecords[chartRecords.length - 1].open || 0))
+                      (visibleRecords[visibleRecords.length - 1].close >=
+                        (visibleRecords[visibleRecords.length - 1].open || 0))
                         ? "#22c55e"
                         : "#ef4444"
                     }
@@ -258,9 +534,9 @@ export const StockTechnicalChart: React.FC<StockTechnicalChartProps> = ({
                   yAxisId="vol"
                   dataKey="volume"
                   fill="#238636"
-                  opacity={0.2}
+                  opacity={0.25}
                   radius={[2, 2, 0, 0]}
-                  barSize={8}
+                  maxBarSize={18}
                 />
 
                 {/* Moving Average Overlays */}
@@ -272,7 +548,7 @@ export const StockTechnicalChart: React.FC<StockTechnicalChartProps> = ({
                       dataKey="ma20"
                       stroke="#F59E0B"
                       dot={false}
-                      strokeWidth={1.2}
+                      strokeWidth={1.5}
                       name="MA20"
                     />
                     <Line
@@ -281,7 +557,7 @@ export const StockTechnicalChart: React.FC<StockTechnicalChartProps> = ({
                       dataKey="ma50"
                       stroke="#8B5CF6"
                       dot={false}
-                      strokeWidth={1.2}
+                      strokeWidth={1.5}
                       name="MA50"
                     />
                   </>
@@ -328,33 +604,40 @@ export const StockTechnicalChart: React.FC<StockTechnicalChartProps> = ({
                   dataKey={(d: any) => [d.open, d.close]}
                   shape={<CandlestickShape />}
                   name="Candlestick"
-                  barSize={7}
+                  maxBarSize={16}
                 />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
 
-          {/* Pane 2: Synced RSI Line Chart */}
-          <div className="h-[90px] w-full">
+          {/* Pane 2: Synced RSI Line Chart with Clean Date X-Axis */}
+          <div className="h-[110px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
-                data={chartRecords}
+                data={visibleRecords}
                 syncId="stockChart"
-                margin={{ top: 5, right: 35, left: 5, bottom: 5 }}
+                margin={{ top: 5, right: 0, left: 0, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#21262D" vertical={false} />
                 <XAxis
                   dataKey="time"
                   tickFormatter={(timeStr) => {
                     try {
-                      return format(new Date(timeStr), "dd/MM");
+                      const d = new Date(timeStr);
+                      if (selectedTimeframe === "3Y" || selectedTimeframe === "1Y") {
+                        return format(d, "MM/yy");
+                      }
+                      return format(d, "dd/MM");
                     } catch {
                       return timeStr;
                     }
                   }}
                   stroke="#6E7681"
-                  tick={{ fontSize: 10 }}
-                  minTickGap={25}
+                  tick={{ fontSize: 10, fill: "#9CA3AF" }}
+                  axisLine={{ stroke: "#30363D" }}
+                  tickLine={{ stroke: "#30363D" }}
+                  minTickGap={35}
+                  padding={{ left: 10, right: 10 }}
                 />
                 <YAxis
                   yAxisId="rsiAxis"
@@ -365,6 +648,7 @@ export const StockTechnicalChart: React.FC<StockTechnicalChartProps> = ({
                   tick={{ fontSize: 9, fill: "#9CA3AF" }}
                   axisLine={{ stroke: "#30363D" }}
                   tickLine={{ stroke: "#30363D" }}
+                  width={52}
                 />
 
                 {/* Boundaries Reference Lines for Overbought (70) and Oversold (30) */}
@@ -388,10 +672,8 @@ export const StockTechnicalChart: React.FC<StockTechnicalChartProps> = ({
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center h-[380px] text-gray-500">
-          <TrendingUp size={40} className="text-gray-700 mb-2" />
-          <p className="text-xs">
-            Không có dữ liệu biểu đồ cho mã này trong khoảng thời gian đã chọn
-          </p>
+          <TrendingUp size={32} className="mb-2 text-gray-600 opacity-50" />
+          <p className="text-xs">Không có dữ liệu biểu đồ cho mã này</p>
         </div>
       )}
     </div>

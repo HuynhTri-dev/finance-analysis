@@ -80,11 +80,11 @@ export const StockHero: React.FC<StockHeroProps> = ({
           <div className="flex items-center justify-start sm:justify-end space-x-2 mt-1">
             <span className={`px-2 py-0.5 rounded text-xs font-semibold border ${priceBgClass}`}>
               {isPriceUp ? "+" : ""}
-              {quote.change ? quote.change.toLocaleString() : "0"} ({isPriceUp ? "+" : ""}
-              {quote.change_pct || 0}%)
+              {quote.change ? `${quote.change.toLocaleString()} đ` : "0 đ"}{" "}
+              ({isPriceUp ? "+" : ""}{quote.change_pct || 0}%)
             </span>
             <span className="text-[11px] text-gray-400">
-              TC: {quote.ref_price?.toLocaleString() || "--"}
+              TC: {quote.ref_price ? `${quote.ref_price.toLocaleString()} đ` : "--"}
             </span>
           </div>
         </div>

@@ -231,42 +231,70 @@ export const StockOrderFlowCards: React.FC<StockOrderFlowCardsProps> = ({
                 <div className="flex justify-between py-1 border-b border-[#30363D]/40">
                   <span className="text-gray-400">Khối lượng:</span>
                   <span className="font-semibold text-gray-200 font-mono">
-                    {quote.total_volume ? quote.total_volume.toLocaleString() : "1,748,900"}
+                    {quote.total_volume ? `${quote.total_volume.toLocaleString()} cp` : "--"}
                   </span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-[#30363D]/40">
                   <span className="text-gray-400">Giá trị:</span>
                   <span className="font-semibold text-emerald-400 font-mono">
                     {quote.total_value
-                      ? `${(quote.total_value / 1e9).toFixed(2)} tỷ`
-                      : "30.25 tỷ"}
+                      ? quote.total_value >= 1_000_000_000_000
+                        ? `${(quote.total_value / 1e12).toFixed(2)} nghìn tỷ đ`
+                        : `${(quote.total_value / 1e9).toFixed(2)} tỷ đ`
+                      : "--"}
                   </span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-[#30363D]/40">
                   <span className="text-gray-400">KLTB 10 ngày:</span>
                   <span className="font-semibold text-gray-200 font-mono">
-                    {avg10DayVol.toLocaleString()}
+                    {avg10DayVol ? `${avg10DayVol.toLocaleString()} cp` : "--"}
                   </span>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <div className="flex justify-between py-1 border-b border-[#30363D]/40">
-                  <span className="text-gray-400">Beta:</span>
-                  <span className="font-semibold text-gray-200">{beta}</span>
+                  <span className="text-gray-400 flex items-center gap-1">
+                    Beta (β)
+                    <span className="relative group cursor-pointer text-blue-400 hover:text-blue-300 inline-block">
+                      <Info size={12} />
+                      <span className="pointer-events-none absolute left-0 sm:left-1/2 sm:-translate-x-1/2 bottom-full mb-2 hidden group-hover:block bg-[#161B22] border border-[#30363D] text-[10px] text-gray-300 p-3 rounded-lg shadow-2xl w-[280px] sm:w-[320px] z-50 normal-case leading-relaxed font-normal">
+                        <strong className="text-blue-400 block mb-1 text-[11px] font-semibold">
+                          Hệ số Beta (β) — Đo lường biến động
+                        </strong>
+                        <span>
+                          Đo lường mức độ biến động (rủi ro hệ thống) của cổ phiếu so với tổng thể thị trường chung (VN-Index).
+                        </span>
+                        <div className="mt-1.5 space-y-1 text-gray-300 border-t border-[#30363D]/60 pt-1.5">
+                          <div>
+                            <strong className="text-emerald-400">🛡️ Beta &lt; 1 (Phòng thủ):</strong> Ít biến động hơn thị trường. Đóng vai trò &quot;khiên bảo vệ&quot; khi thị trường giảm, ít sốc nhưng tăng chậm (Điện, Nước, Dược, Bluechips).
+                          </div>
+                          <div>
+                            <strong className="text-rose-400">⚡ Beta &gt; 1 (Nhạy sóng):</strong> Biến động mạnh hơn thị trường (Chứng khoán, BĐS). Tăng nhanh khi uptrend nhưng giảm sâu khi downtrend.
+                          </div>
+                          <div>
+                            <strong className="text-gray-200">⚖️ Beta = 1:</strong> Biến động đồng pha 1:1 với VN-Index.
+                          </div>
+                        </div>
+                      </span>
+                    </span>
+                  </span>
+                  <span className="font-semibold text-gray-200 font-mono">{beta}</span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-[#30363D]/40">
                   <span className="text-gray-400">Thị giá vốn:</span>
                   <span className="font-semibold text-gray-200 font-mono">
                     {quote.market_cap
-                      ? `${(quote.market_cap / 1e9).toFixed(1)} tỷ`
-                      : "7,500.2 tỷ"}
+                      ? quote.market_cap >= 1_000_000_000_000
+                        ? `${(quote.market_cap / 1e12).toFixed(1)} nghìn tỷ đ`
+                        : `${(quote.market_cap / 1e9).toFixed(1)} tỷ đ`
+                      : "--"}
                   </span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-[#30363D]/40">
                   <span className="text-gray-400">Số lượng CPLH:</span>
                   <span className="font-semibold text-gray-200 font-mono">
-                    {quote.listed_shares ? quote.listed_shares.toLocaleString() : "431,046,499"}
+                    {quote.listed_shares ? `${quote.listed_shares.toLocaleString()} cp` : "--"}
                   </span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-[#30363D]/40">

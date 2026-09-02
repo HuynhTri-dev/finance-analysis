@@ -496,10 +496,21 @@ def get_stock_detail(
         # 1. Realtime Quote & Order Book
         quote_data = _fetch_ssi_quote(sym)
 
-        # 2. Historical OHLCV (up to 365 days for accurate 52W & MA50 calculation)
+        # 2. Historical OHLCV (dynamic lookback based on timeframe + buffer for MA50 & 52W)
         now = datetime.now()
         end_date = now.strftime("%Y-%m-%d")
-        start_date = (now - timedelta(days=365)).strftime("%Y-%m-%d")
+        days_map = {
+            "1M": 30,
+            "3M": 90,
+            "6M": 180,
+            "1Y": 365,
+            "3Y": 1095,
+            "5Y": 1825,
+            "ALL": 3650,
+        }
+        lookback_days = days_map.get(timeframe.upper(), 90)
+        fetch_days = max(lookback_days + 60, 365)
+        start_date = (now - timedelta(days=fetch_days)).strftime("%Y-%m-%d")
 
         try:
             df = _fetch_historical_ohlcv(
@@ -550,8 +561,6 @@ def get_stock_detail(
             technicals = _compute_technical_indicators(df)
 
             # Filter dataframe for requested timeframe
-            days_map = {"1M": 30, "3M": 90, "6M": 180, "1Y": 365}
-            lookback_days = days_map.get(timeframe.upper(), 90)
             cutoff_date = (now - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
             
             df_filtered = df[df["time"].astype(str) >= cutoff_date].copy()

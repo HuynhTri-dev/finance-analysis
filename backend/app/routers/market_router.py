@@ -35,7 +35,7 @@ def get_market_overview():
 @router.get("/stock/{symbol}", summary="Complete Dashboard Details for a Single Ticker")
 def get_stock_detail(
     symbol: str,
-    timeframe: str = Query("3M", description="Chart timeframe: 1M, 3M, 6M, 1Y"),
+    timeframe: str = Query("3M", description="Chart timeframe: 1M, 3M, 6M, 1Y, 3Y, 5Y"),
     start: Optional[str] = None,
     end: Optional[str] = None,
     interval: str = "1D",
