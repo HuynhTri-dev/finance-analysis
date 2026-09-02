@@ -27,6 +27,7 @@ import {
   StockOrderFlowCards,
   StockNews,
   RightSidebar,
+  RiskDashboard,
 } from "@/components";
 
 const getRecommendation = (detail: any) => {
@@ -542,6 +543,9 @@ export default function Home() {
                 showMAs={showMAs}
                 onToggleMAs={() => setShowMAs(!showMAs)}
               />
+
+              {/* Phân tích Kỹ thuật & Cơ bản (Risk Dashboard) */}
+              <RiskDashboard symbol={activeSymbol} />
 
               {/* 4. Four Analytics Cards Grid */}
               <StockOrderFlowCards

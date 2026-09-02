@@ -18,6 +18,7 @@ Cấu trúc backend tuân thủ **Controller-Service-Repository**:
 - **Services (Business Logic):** `services/`.
   - `MarketService`: Tương tác `vnstock` để lấy 3 chỉ số Index, Top 10 và dữ liệu OHLCV của mã lẻ.
   - `NewsService`: Chạy crawler định kỳ, lưu trữ, trích xuất và filter văn bản báo chí (Vĩ mô vs Watchlist).
+  - `RiskScoringService`: Động cơ tính toán chỉ số kỹ thuật (RSI, MACD, Bollinger Bands) và chấm điểm rủi ro `BUY_RISK`, `SELL_RISK` dựa trên dữ liệu EOD.
   - `AIOrchestratorService`: Xây dựng system prompt, nhúng context (dữ liệu giá + tin tức) và gọi Ollama AI model.
   - `ReportGenerationService`: Chuyển đổi Markdown do AI sinh ra thành file PDF (dùng `pdfkit` hoặc thư viện tương đương) và quản lý tiến trình đẩy lên Cloudflare.
 - **Repositories (Data Access):** `repositories/`. Giao tiếp với cơ sở dữ liệu PostgreSQL (Lưu trữ Serverless qua Neon) cho thông tin người dùng, danh mục theo dõi (watchlist) và lịch sử lưu trữ tin tức. Dùng SQLAlchemy hoặc SQLModel làm ORM.

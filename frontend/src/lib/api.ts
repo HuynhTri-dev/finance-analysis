@@ -73,6 +73,12 @@ export const analyzeApi = {
     const response = await apiClient.post('/analyze/detail', { symbol });
     return response.data;
   },
+  getRiskAnalysis: async (symbol: string, forceRefresh: boolean = false) => {
+    const response = await apiClient.get(`/analyze/risk/${symbol}`, {
+      params: { force_refresh: forceRefresh }
+    });
+    return response.data;
+  },
 };
 
 export const reportApi = {
