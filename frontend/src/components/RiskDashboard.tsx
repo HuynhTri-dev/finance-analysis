@@ -266,20 +266,20 @@ export const RiskDashboard: React.FC<Props> = ({ symbol }) => {
   const sellReasonsList = data.details?.sell_reasons_detail || data.details?.sell_reasons?.map((r) => ({ code: r, title: r })) || [];
 
   return (
-    <div className="bg-gray-850 border border-gray-700/60 rounded-xl p-5 mt-6 shadow-2xl transition-all">
+    <div className="@container bg-gray-850 border border-gray-700/60 rounded-xl p-4 sm:p-5 mt-6 shadow-2xl transition-all">
       {/* HEADER */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-5 pb-4 border-b border-gray-700/60">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg md:text-xl font-bold text-white flex items-center gap-2">
-              <Layers className="w-5 h-5 text-blue-400" />
-              Phân Tích Cơ Bản & Rủi Ro: <span className="text-blue-400">{symbol}</span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-4 border-b border-gray-700/60">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base sm:text-lg md:text-xl font-bold text-white flex items-center gap-2 truncate">
+              <Layers className="w-5 h-5 text-blue-400 shrink-0" />
+              <span>Phân Tích Cơ Bản & Rủi Ro: <span className="text-blue-400">{symbol}</span></span>
             </h2>
-            <span className="text-xs text-gray-400 px-2 py-0.5 bg-gray-800 border border-gray-700 rounded-md">
+            <span className="text-xs text-gray-400 px-2 py-0.5 bg-gray-800 border border-gray-700 rounded-md shrink-0">
               {data.as_of_date}
             </span>
             {data.exchange_limit_hit && (
-              <span className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-md flex items-center gap-1">
+              <span className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
                 <AlertCircle className="w-3.5 h-3.5" /> Biên độ Trần/Sàn
               </span>
             )}
@@ -289,11 +289,11 @@ export const RiskDashboard: React.FC<Props> = ({ symbol }) => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
           <button
             onClick={() => fetchRiskData(true)}
             disabled={refreshing}
-            className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 active:scale-95 text-gray-200 text-xs rounded-lg transition-all flex items-center gap-1.5 border border-gray-600/50"
+            className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 active:scale-95 text-gray-200 text-xs rounded-lg transition-all flex items-center gap-1.5 border border-gray-600/50 whitespace-nowrap"
             title="Tính toán lại dữ liệu mới nhất từ vnstock"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-blue-400' : ''}`} />
@@ -302,7 +302,7 @@ export const RiskDashboard: React.FC<Props> = ({ symbol }) => {
 
           <button
             onClick={() => setExpanded(!expanded)}
-            className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5"
+            className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 whitespace-nowrap"
           >
             <Sliders className="w-3.5 h-3.5 text-blue-400" />
             <span>{expanded ? 'Thu gọn' : 'Xem chi tiết số liệu & công thức'}</span>
@@ -311,23 +311,24 @@ export const RiskDashboard: React.FC<Props> = ({ symbol }) => {
         </div>
       </div>
 
-      {/* 3 CARDS GRID (RESPONSIVE) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* 3 CARDS GRID: Responsive across Viewport and Parent Container */}
+      <div className="grid grid-cols-1 @xl:grid-cols-3 gap-3.5 sm:gap-4">
         {/* CARD 1: BUY RISK */}
-        <div className={`p-4 rounded-xl border flex flex-col justify-between transition-all ${buyStyle.card}`}>
+        <div className={`p-4 rounded-xl border flex flex-col justify-between transition-all min-w-0 ${buyStyle.card}`}>
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-1">
-                <TrendingUp className="w-4 h-4 text-gray-400" /> Rủi ro Mua Đuổi
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-gray-300 flex items-center gap-1.5 min-w-0 truncate">
+                <TrendingUp className="w-4 h-4 text-gray-400 shrink-0" />
+                <span className="truncate">Rủi ro Mua Đuổi</span>
               </span>
-              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${buyStyle.badge}`}>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border shrink-0 whitespace-nowrap ${buyStyle.badge}`}>
                 {data.buy_level}
               </span>
             </div>
 
-            <div className="flex items-baseline gap-2 mb-2">
-              <span className={`text-4xl font-extrabold ${buyStyle.text}`}>{data.buy_score}</span>
-              <span className="text-xs text-gray-500">/ 100</span>
+            <div className="flex items-baseline gap-1.5 mb-2">
+              <span className={`text-3xl sm:text-4xl font-extrabold ${buyStyle.text}`}>{data.buy_score}</span>
+              <span className="text-xs text-gray-500 font-medium">/ 100</span>
             </div>
 
             <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden mb-3">
@@ -337,9 +338,9 @@ export const RiskDashboard: React.FC<Props> = ({ symbol }) => {
             <div className="space-y-1.5">
               {buyReasonsList.length > 0 ? (
                 buyReasonsList.map((r, i) => (
-                  <div key={i} className="text-xs text-gray-300 bg-gray-800/80 px-2 py-1 rounded border border-gray-700/40 flex items-start gap-1.5 leading-snug">
+                  <div key={i} className="text-xs text-gray-300 bg-gray-800/80 px-2.5 py-1.5 rounded-lg border border-gray-700/40 flex items-start gap-1.5 leading-snug break-words">
                     <span className="text-red-400 shrink-0 mt-0.5">•</span>
-                    <span>{r.title}</span>
+                    <span className="break-words">{r.title}</span>
                   </div>
                 ))
               ) : (
@@ -347,36 +348,37 @@ export const RiskDashboard: React.FC<Props> = ({ symbol }) => {
               )}
             </div>
           </div>
-          <div className="text-[11px] text-gray-500 mt-3 pt-2 border-t border-gray-800">
+          <div className="text-[11px] text-gray-500 mt-3 pt-2 border-t border-gray-800/80">
             {data.buy_score >= 60 ? '⚠️ Cảnh báo: Tránh mở vị thế mua đuổi giá cao' : '✓ Vùng giá an toàn, không có phân kỳ đỉnh'}
           </div>
         </div>
 
         {/* CARD 2: F-SCORE (RESPONSIVE PROGRESS PILLARS) */}
-        <div className="p-4 rounded-xl border border-gray-700/60 bg-gradient-to-b from-gray-800/40 to-gray-900 flex flex-col justify-between">
+        <div className="p-4 rounded-xl border border-gray-700/60 bg-gradient-to-b from-gray-800/40 to-gray-900 flex flex-col justify-between min-w-0">
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-300 flex items-center gap-1">
-                <BarChart3 className="w-4 h-4 text-blue-400" /> Sức Khỏe Cơ Bản (F-Score)
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-gray-300 flex items-center gap-1.5 min-w-0 truncate">
+                <BarChart3 className="w-4 h-4 text-blue-400 shrink-0" />
+                <span className="truncate">Chất Lượng F-Score</span>
               </span>
-              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${fBadge.color}`}>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border shrink-0 whitespace-nowrap ${fBadge.color}`}>
                 {fBadge.text}
               </span>
             </div>
 
-            <div className="flex items-baseline gap-2 mb-3">
-              <span className="text-4xl font-extrabold text-white">
+            <div className="flex items-baseline gap-1.5 mb-2.5">
+              <span className="text-3xl sm:text-4xl font-extrabold text-white">
                 {data.f_score !== null ? data.f_score : '--'}
               </span>
               <span className="text-xs text-gray-500 font-medium">/ 9 Tiêu chí</span>
             </div>
 
-            <div className="space-y-2.5 my-2">
+            <div className="space-y-2 my-2">
               {/* Pillar 1 */}
               <div>
-                <div className="flex justify-between text-xs mb-1">
+                <div className="flex justify-between text-[11px] sm:text-xs mb-1">
                   <span className="text-gray-300">1. Sinh lời</span>
-                  <span className="text-gray-400 font-medium">
+                  <span className="text-gray-400 font-mono font-medium">
                     {pillars.profitability.score} / {pillars.profitability.max}
                   </span>
                 </div>
@@ -392,9 +394,9 @@ export const RiskDashboard: React.FC<Props> = ({ symbol }) => {
 
               {/* Pillar 2 */}
               <div>
-                <div className="flex justify-between text-xs mb-1">
+                <div className="flex justify-between text-[11px] sm:text-xs mb-1">
                   <span className="text-gray-300">2. Đòn bẩy & TK</span>
-                  <span className="text-gray-400 font-medium">
+                  <span className="text-gray-400 font-mono font-medium">
                     {pillars.leverage.score} / {pillars.leverage.max}
                   </span>
                 </div>
@@ -410,9 +412,9 @@ export const RiskDashboard: React.FC<Props> = ({ symbol }) => {
 
               {/* Pillar 3 */}
               <div>
-                <div className="flex justify-between text-xs mb-1">
+                <div className="flex justify-between text-[11px] sm:text-xs mb-1">
                   <span className="text-gray-300">3. Hiệu quả HĐ</span>
-                  <span className="text-gray-400 font-medium">
+                  <span className="text-gray-400 font-mono font-medium">
                     {pillars.efficiency.score} / {pillars.efficiency.max}
                   </span>
                 </div>
@@ -428,10 +430,10 @@ export const RiskDashboard: React.FC<Props> = ({ symbol }) => {
             </div>
           </div>
 
-          <div className="text-[11px] text-gray-400 mt-2 pt-2 border-t border-gray-800/80 flex items-center justify-between">
+          <div className="text-[11px] text-gray-400 mt-2 pt-2 border-t border-gray-800/80 flex flex-wrap items-center justify-between gap-1">
             <span>P/E: {valuation?.pe ? `${valuation.pe}x` : '--'} | P/B: {valuation?.pb ? `${valuation.pb}x` : '--'}</span>
             <span
-              className="text-blue-400 cursor-pointer hover:underline flex items-center gap-0.5"
+              className="text-blue-400 cursor-pointer hover:underline flex items-center gap-0.5 whitespace-nowrap"
               onClick={() => { setExpanded(true); setActiveTab('fscore'); }}
             >
               Công thức & đối chiếu →
@@ -440,20 +442,21 @@ export const RiskDashboard: React.FC<Props> = ({ symbol }) => {
         </div>
 
         {/* CARD 3: SELL RISK */}
-        <div className={`p-4 rounded-xl border flex flex-col justify-between transition-all ${sellStyle.card}`}>
+        <div className={`p-4 rounded-xl border flex flex-col justify-between transition-all min-w-0 ${sellStyle.card}`}>
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-1">
-                <TrendingDown className="w-4 h-4 text-gray-400" /> Rủi ro Bán Cạn Cung
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-gray-300 flex items-center gap-1.5 min-w-0 truncate">
+                <TrendingDown className="w-4 h-4 text-gray-400 shrink-0" />
+                <span className="truncate">Rủi ro Bán Cạn Cung</span>
               </span>
-              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${sellStyle.badge}`}>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border shrink-0 whitespace-nowrap ${sellStyle.badge}`}>
                 {data.sell_level}
               </span>
             </div>
 
-            <div className="flex items-baseline gap-2 mb-2">
-              <span className={`text-4xl font-extrabold ${sellStyle.text}`}>{data.sell_score}</span>
-              <span className="text-xs text-gray-500">/ 100</span>
+            <div className="flex items-baseline gap-1.5 mb-2">
+              <span className={`text-3xl sm:text-4xl font-extrabold ${sellStyle.text}`}>{data.sell_score}</span>
+              <span className="text-xs text-gray-500 font-medium">/ 100</span>
             </div>
 
             <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden mb-3">
@@ -463,9 +466,9 @@ export const RiskDashboard: React.FC<Props> = ({ symbol }) => {
             <div className="space-y-1.5">
               {sellReasonsList.length > 0 ? (
                 sellReasonsList.map((r, i) => (
-                  <div key={i} className="text-xs text-gray-300 bg-gray-800/80 px-2 py-1 rounded border border-gray-700/40 flex items-start gap-1.5 leading-snug">
+                  <div key={i} className="text-xs text-gray-300 bg-gray-800/80 px-2.5 py-1.5 rounded-lg border border-gray-700/40 flex items-start gap-1.5 leading-snug break-words">
                     <span className="text-emerald-400 shrink-0 mt-0.5">•</span>
-                    <span>{r.title}</span>
+                    <span className="break-words">{r.title}</span>
                   </div>
                 ))
               ) : (
@@ -474,7 +477,7 @@ export const RiskDashboard: React.FC<Props> = ({ symbol }) => {
             </div>
           </div>
 
-          <div className="text-[11px] text-gray-500 mt-3 pt-2 border-t border-gray-800">
+          <div className="text-[11px] text-gray-500 mt-3 pt-2 border-t border-gray-800/80">
             {data.sell_score >= 60 ? '⚠️ Cảnh báo: Vùng cạn cung, tránh bán tháo hoảng loạn' : '✓ Áp lực cung bán ở mức bình thường'}
           </div>
         </div>
@@ -552,60 +555,64 @@ export const RiskDashboard: React.FC<Props> = ({ symbol }) => {
               </div>
 
               {signals.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {['Sinh lời', 'Đòn bẩy', 'Hiệu quả'].map((pillarName) => (
-                    <div key={pillarName} className="bg-gray-900/70 border border-gray-700/60 rounded-xl p-3">
-                      <div className="text-xs font-bold text-gray-200 pb-2 mb-2 border-b border-gray-700/60 flex items-center justify-between">
-                        <span>Trụ cột: {pillarName}</span>
-                        <span className="text-[11px] font-medium text-gray-400">
-                          {signals.filter((s) => s.pillar === pillarName && s.passed).length}/
-                          {signals.filter((s) => s.pillar === pillarName).length} đạt
-                        </span>
-                      </div>
+                <div className="grid grid-cols-1 @2xl:grid-cols-3 gap-3.5">
+                  {['Sinh lời', 'Đòn bẩy', 'Hiệu quả'].map((pillarName, idx) => {
+                    const pillarPassed = signals.filter((s) => s.pillar === pillarName && s.passed).length;
+                    const pillarTotal = signals.filter((s) => s.pillar === pillarName).length;
+                    return (
+                      <div key={pillarName} className="bg-gray-900/70 border border-gray-700/60 rounded-xl p-3.5 min-w-0">
+                        <div className="text-xs font-bold text-gray-200 pb-2.5 mb-3 border-b border-gray-700/60 flex items-center justify-between gap-2">
+                          <span className="whitespace-nowrap font-bold text-gray-100">
+                            Trụ cột {idx + 1}: {pillarName}
+                          </span>
+                          <span className="text-[11px] font-semibold text-gray-300 bg-gray-800 px-2 py-0.5 rounded border border-gray-700 shrink-0">
+                            {pillarPassed}/{pillarTotal} đạt
+                          </span>
+                        </div>
 
-                      <div className="space-y-2">
-                        {signals
-                          .filter((s) => s.pillar === pillarName)
-                          .map((sig) => {
-                            const isDetailOpen = expandedSignalId === sig.id;
-                            return (
-                              <div
-                                key={sig.id}
-                                className={`rounded-lg border text-xs transition-all overflow-hidden ${
-                                  sig.passed
-                                    ? 'bg-emerald-950/20 border-emerald-500/30'
-                                    : 'bg-rose-950/20 border-rose-500/20'
-                                }`}
-                              >
+                        <div className="space-y-2.5">
+                          {signals
+                            .filter((s) => s.pillar === pillarName)
+                            .map((sig) => {
+                              const isDetailOpen = expandedSignalId === sig.id;
+                              return (
                                 <div
-                                  className="p-2.5 cursor-pointer flex flex-col gap-1.5 select-none"
-                                  onClick={() => setExpandedSignalId(isDetailOpen ? null : sig.id)}
+                                  key={sig.id}
+                                  className={`rounded-lg border text-xs transition-all overflow-hidden ${
+                                    sig.passed
+                                      ? 'bg-emerald-950/20 border-emerald-500/30'
+                                      : 'bg-rose-950/20 border-rose-500/20'
+                                  }`}
                                 >
-                                  <div className="flex items-start justify-between gap-1.5">
-                                    <span className="font-semibold text-gray-100">
-                                      {sig.id}. {sig.title}
-                                    </span>
-                                    {sig.passed ? (
-                                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                                    ) : (
-                                      <XCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-                                    )}
-                                  </div>
+                                  <div
+                                    className="p-3 cursor-pointer flex flex-col gap-2 select-none"
+                                    onClick={() => setExpandedSignalId(isDetailOpen ? null : sig.id)}
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <span className="font-bold text-gray-100 leading-snug">
+                                        {sig.id}. {sig.title}
+                                      </span>
+                                      {sig.passed ? (
+                                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                                      ) : (
+                                        <XCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                                      )}
+                                    </div>
 
-                                  <div className="flex items-center justify-between gap-2">
-                                    {sig.value && (
-                                      <div className="text-[11px] font-mono text-gray-200 bg-black/40 px-2 py-0.5 rounded border border-gray-700/40">
-                                        {sig.value}
-                                      </div>
-                                    )}
-                                    <span className="text-[10px] text-blue-400 hover:underline flex items-center gap-0.5">
-                                      {isDetailOpen ? 'Ẩn công thức' : 'Chi tiết phép tính'}
-                                      {isDetailOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                                    </span>
-                                  </div>
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      {sig.value && (
+                                        <div className="text-[11px] font-mono text-gray-200 bg-black/40 px-2 py-0.5 rounded border border-gray-700/40 break-all font-semibold">
+                                          {sig.value}
+                                        </div>
+                                      )}
+                                      <span className="text-[11px] text-blue-400 hover:underline flex items-center gap-0.5 font-medium ml-auto shrink-0">
+                                        {isDetailOpen ? 'Ẩn công thức' : 'Chi tiết phép tính'}
+                                        {isDetailOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                      </span>
+                                    </div>
 
-                                  <p className="text-[11px] text-gray-400 leading-snug">{sig.desc}</p>
-                                </div>
+                                    <p className="text-[11px] text-gray-400 leading-relaxed">{sig.desc}</p>
+                                  </div>
 
                                 {/* DROPDOWN FORMULA BREAKDOWN */}
                                 {isDetailOpen && (
@@ -639,9 +646,10 @@ export const RiskDashboard: React.FC<Props> = ({ symbol }) => {
                               </div>
                             );
                           })}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="p-4 bg-gray-900/40 text-gray-400 text-xs text-center rounded-lg">
