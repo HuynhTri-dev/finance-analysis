@@ -1,14 +1,32 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
-
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8001/api';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// Fallback interceptor: if localhost fails with Network Error (common macOS IPv6 issue), retry with 127.0.0.1
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.message === 'Network Error' && error.config && !error.config._retry) {
+      error.config._retry = true;
+      if (error.config.baseURL?.includes('localhost')) {
+        error.config.baseURL = error.config.baseURL.replace('localhost', '127.0.0.1');
+        return axios(error.config);
+      } else if (error.config.baseURL?.includes('127.0.0.1')) {
+        error.config.baseURL = error.config.baseURL.replace('127.0.0.1', 'localhost');
+        return axios(error.config);
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 export const authApi = {
   login: async (username: string, password: string) => {
