@@ -275,30 +275,41 @@ async def generate_comprehensive_analysis_report(
         elif isinstance(bctc_summary, str):
             bctc_context_txt = bctc_summary[:4000]
 
+    # Helper for visual progress bars in Markdown
+    def _bar(val: int, max_val: int = 100) -> str:
+        pct = min(100, max(0, int((val / max_val) * 10)))
+        return f"`[{'█' * pct}{'░' * (10 - pct)}] {val}/{max_val}`"
+
+    buy_bar = _bar(buy_score, 100)
+    sell_bar = _bar(sell_score, 100)
+    f_bar = _bar(f_score, 9) if f_score is not None else "`[Đang cập nhật]`"
+
     prompt = f"""{SYSTEM_PROMPT}
 
 Nhiệm vụ của bạn là tổng hợp Báo cáo Phân tích Tài chính Toàn cảnh Đa chiều cho mã cổ phiếu {symbol}.
-Báo cáo BẮT BUỘC phải tuân thủ đúng cấu trúc 3 PHẦN sau đây:
+Báo cáo BẮT BUỘC phải tuân thủ đúng cấu trúc 3 PHẦN sau đây và sử dụng các thanh hiển thị chỉ số trực quan:
 
 # BÁO CÁO PHÂN TÍCH TOÀN CẢNH ĐA CHIỀU: {symbol}
 
 ## PHẦN 1: ĐÁNH GIÁ SỨC KHỎE TÀI CHÍNH & CHẤT LƯỢNG DOANH NGHIỆP
-- Đánh giá tăng trưởng doanh thu, lợi nhuận và chất lượng dòng tiền kinh doanh (CFO).
+- Thước đo Piotroski F-Score: {f_bar}
+- Đánh giá chi tiết tăng trưởng doanh thu, lợi nhuận và chất lượng dòng tiền kinh doanh (CFO).
 - Phân tích cơ cấu nợ vay, tỷ lệ đòn bẩy và sức chống chịu rủi ro.
-- Nhận định ý nghĩa điểm Piotroski F-Score ({f_score}/9) và các chỉ số định giá P/E, P/B, ROE.
+- Nhận định ý nghĩa định giá P/E, P/B, ROE so với quy mô doanh nghiệp.
 
-## PHẦN 2: XU HƯỚNG KỸ THUẬT & VÙNG RỦI RO THỊ TRƯỜNG
-- Đánh giá điểm BUY_RISK ({buy_score}/100 - Cấp độ: {buy_level}) và SELL_RISK ({sell_score}/100 - Cấp độ: {sell_level}).
+## PHẦN 2: XU HƯỚNG KỸ THUẬT & TƯƠNG QUAN THỊ TRƯỜNG
+- Thước đo Rủi ro Mua đuổi (BUY_RISK): {buy_bar} ({buy_level})
+- Thước đo Rủi ro Bán cạn cung (SELL_RISK): {sell_bar} ({sell_level})
+- **Tương quan Xu hướng & Động lượng:** Phân tích độ nhạy (Beta kỹ thuật) và tính tương quan giữa biến động giá {symbol} so với xu hướng chung của thị trường (VN-Index).
 - Phân tích các mã tín hiệu kỹ thuật thực tế:
   * Tín hiệu cảnh báo rủi ro Mua đuổi:
 {buy_reasons_txt}
   * Tín hiệu rủi ro Bán cạn cung:
 {sell_reasons_txt}
-- Đánh giá áp lực cung - cầu và vị thế giá hiện tại.
 
 ## PHẦN 3: KỊCH BẢN HÀNH ĐỘNG & KHUYẾN CÁO AN TOÀN
-- Kịch bản tổng hợp: "{scenario}"
-- Đưa ra các mốc giá then chốt cần quan sát (vùng hỗ trợ/kháng cự giả định theo biến động).
+- Kịch bản tổng hợp chiến lược: "{scenario}"
+- Đưa ra các mốc giá hỗ trợ/kháng cự then chốt cần quan sát.
 - Hướng dẫn quản trị rủi ro danh mục dựa trên xác suất xu hướng (tuyệt đối không khuyên mua/bán).
 
 ---
@@ -308,7 +319,7 @@ DỮ LIỆU ĐẦU VÀO ĐỂ TỔNG HỢP:
 {fundamental_txt}
 {bctc_context_txt}
 
-### 2. Dữ liệu Rủi ro Kỹ thuật:
+### 2. Dữ liệu Rủi ro Kỹ thuật & Tương quan:
 - Điểm BUY_RISK: {buy_score}/100 ({buy_level})
 - Điểm SELL_RISK: {sell_score}/100 ({sell_level})
 - Kịch bản hệ thống gợi ý: {scenario}

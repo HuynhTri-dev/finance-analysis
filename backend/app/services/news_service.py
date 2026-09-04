@@ -206,8 +206,7 @@ async def get_news_by_category(db: AsyncSession, category: str, limit: int = 20)
 async def get_news_by_symbol(db: AsyncSession, symbol: str, limit: int = 10) -> list[dict]:
     """
     Retrieve the latest articles linked to a specific watchlist symbol.
-    Falls back to keyword matching or recent market articles from NewsArticle
-    if no direct ArticleSymbol relationship exists yet.
+    Falls back to recent market articles if no direct ArticleSymbol relationship exists.
 
     Args:
         db:     Active async SQLAlchemy session.
@@ -218,50 +217,37 @@ async def get_news_by_symbol(db: AsyncSession, symbol: str, limit: int = 10) -> 
         List of article dicts.
     """
     sym = symbol.strip().upper()
-    
-    # 1. Direct link through article_symbol
-    result = await db.execute(
-        select(NewsArticle)
-        .join(ArticleSymbol, ArticleSymbol.article_id == NewsArticle.id)
-        .where(ArticleSymbol.symbol == sym)
-        .order_by(NewsArticle.published_at.desc())
-        .limit(limit)
-    )
-    articles = list(result.scalars().all())
-
-    # 2. If fewer than limit, search NewsArticle by symbol keyword in title/summary
-    if len(articles) < limit:
-        existing_ids = {a.id for a in articles}
-        keyword_result = await db.execute(
+    try:
+        # 1. Direct link through article_symbol (Indexed join)
+        result = await db.execute(
             select(NewsArticle)
-            .where(
-                (NewsArticle.title.ilike(f"%{sym}%")) | (NewsArticle.content_summary.ilike(f"%{sym}%"))
-            )
-            .order_by(NewsArticle.published_at.desc())
-            .limit(limit - len(articles))
-        )
-        for ka in keyword_result.scalars().all():
-            if ka.id not in existing_ids:
-                articles.append(ka)
-                existing_ids.add(ka.id)
-
-    # 3. Fallback to latest general market NewsArticle if still empty
-    if not articles:
-        fallback_result = await db.execute(
-            select(NewsArticle)
+            .join(ArticleSymbol, ArticleSymbol.article_id == NewsArticle.id)
+            .where(ArticleSymbol.symbol == sym)
             .order_by(NewsArticle.published_at.desc())
             .limit(limit)
         )
-        articles = list(fallback_result.scalars().all())
+        articles = list(result.scalars().all())
 
-    return [
-        {
-            "id": a.id,
-            "title": a.title,
-            "url": a.url,
-            "source": a.source,
-            "summary": a.content_summary,
-            "published_at": a.published_at.isoformat(),
-        }
-        for a in articles
-    ]
+        # 2. Fast fallback to latest market news if no direct link
+        if not articles:
+            fallback_result = await db.execute(
+                select(NewsArticle)
+                .order_by(NewsArticle.published_at.desc())
+                .limit(limit)
+            )
+            articles = list(fallback_result.scalars().all())
+
+        return [
+            {
+                "id": a.id,
+                "title": a.title,
+                "url": a.url,
+                "source": a.source,
+                "summary": a.content_summary,
+                "published_at": a.published_at.isoformat() if a.published_at else "",
+            }
+            for a in articles
+        ]
+    except Exception as e:
+        logger.warning("[News Service] Error getting news for symbol %s: %s", symbol, e)
+        return []

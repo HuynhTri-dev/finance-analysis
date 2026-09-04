@@ -285,15 +285,27 @@ export default function Home() {
   ): Promise<void> => {
     try {
       setLoadingDetail(true);
-      const [detailData, newsData] = await Promise.all([
+      const [detailRes, newsRes] = await Promise.allSettled([
         marketApi.getDetail(symbol, timeframe),
         newsApi.getNewsBySymbol(symbol),
       ]);
-      setSymbolDetail(detailData);
-      const articles = Array.isArray(newsData)
-        ? newsData
-        : newsData?.articles || newsData?.news || [];
-      setNews(articles);
+
+      if (detailRes.status === "fulfilled") {
+        setSymbolDetail(detailRes.value);
+      } else {
+        console.error("Error loading stock detail:", detailRes.reason);
+      }
+
+      if (newsRes.status === "fulfilled") {
+        const newsData = newsRes.value;
+        const articles = Array.isArray(newsData)
+          ? newsData
+          : newsData?.articles || newsData?.news || [];
+        setNews(articles);
+      } else {
+        console.warn("Could not load symbol news (timeout/error):", newsRes.reason);
+        setNews([]);
+      }
     } catch (e) {
       console.error("Error loading symbol detail:", e);
     } finally {
@@ -380,7 +392,10 @@ export default function Home() {
     setSidebarTab("chat");
     setIsAnalyzing(true);
     setAgentLogs([
-      { type: "system", content: "Đang tiến hành phân tích dữ liệu chuyên sâu..." },
+      {
+        type: "system",
+        content: `⚡ AI đang khởi tạo bài đánh giá chuyên sâu cho mã ${activeSymbol || "thị trường chung"}... Vui lòng đợi trong giây lát (hoặc xem file PDF báo cáo vừa tạo).`,
+      },
     ]);
 
     try {
@@ -391,7 +406,12 @@ export default function Home() {
         res = await analyzeApi.analyzeOverview();
       }
 
-      const content = res.data?.markdown_content || "Không có nội dung phân tích.";
+      const content =
+        res?.markdown_content ||
+        res?.data?.markdown_content ||
+        "Không có nội dung phân tích.";
+      const pdfUrl = res?.pdf_url || res?.data?.pdf_url || null;
+
       setAgentLogs((prev) => [
         ...prev,
         {
@@ -406,13 +426,13 @@ export default function Home() {
           id: Date.now().toString(),
           role: "assistant",
           content,
-          pdf_url: res.data?.pdf_url || null,
+          pdf_url: pdfUrl,
           timestamp: new Date().toISOString(),
         },
       ]);
 
-      if (res.data?.pdf_url) {
-        setAgentLogs((prev) => [...prev, { type: "pdf", content: res.data.pdf_url }]);
+      if (pdfUrl) {
+        setAgentLogs((prev) => [...prev, { type: "pdf", content: pdfUrl }]);
         fetchPdfReports();
       }
     } catch (e) {

@@ -4,7 +4,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8001/a
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -84,16 +84,17 @@ export const watchlistApi = {
 
 export const analyzeApi = {
   analyzeOverview: async () => {
-    const response = await apiClient.post('/analyze/overview');
+    const response = await apiClient.post('/analyze/overview', {}, { timeout: 75000 });
     return response.data;
   },
   analyzeSymbol: async (symbol: string) => {
-    const response = await apiClient.post('/analyze/detail', { symbol });
+    const response = await apiClient.post('/analyze/detail', { symbol }, { timeout: 75000 });
     return response.data;
   },
   getRiskAnalysis: async (symbol: string, forceRefresh: boolean = false) => {
     const response = await apiClient.get(`/analyze/risk/${symbol}`, {
-      params: { force_refresh: forceRefresh }
+      params: { force_refresh: forceRefresh },
+      timeout: 75000,
     });
     return response.data;
   },

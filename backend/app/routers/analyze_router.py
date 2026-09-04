@@ -31,6 +31,9 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+_cached_vnindex_df: Optional[pd.DataFrame] = None
+_cached_vnindex_time: Optional[datetime] = None
+
 router = APIRouter(prefix="/api/analyze", tags=["Analysis"])
 
 
@@ -48,48 +51,38 @@ async def get_db() -> AsyncSession:
 # Helper: render markdown → PDF & upload to Cloudflare R2 / Local fallback
 # ---------------------------------------------------------------------------
 
-async def _upload_report_to_storage(content: str, filename: str) -> dict | None:
+async def _upload_report_to_storage(
+    content: str,
+    filename: str,
+    symbol: Optional[str] = None,
+    chart_image_bytes: Optional[bytes] = None,
+    risk_data: Optional[dict] = None,
+) -> dict | None:
     """
-    Convert markdown report to PDF bytes and upload to Cloudflare R2 / local fallback.
-    Returns metadata dictionary or None on failure.
+    Convert markdown report to professional PDF bytes with headers/footers/charts
+    and upload to Cloudflare R2 / local fallback.
 
     Args:
         content:  Markdown string from AI.
-        filename: Destination filename (e.g. "overview_20260828.pdf").
+        filename: Destination filename (e.g. "comprehensive_CMG_20260904.pdf").
+        symbol: Ticker symbol (e.g. "CMG").
+        chart_image_bytes: PNG bytes of correlation/risk chart.
+        risk_data: Risk evaluation dictionary.
 
     Returns:
         Dict with url, object_name, size_kb, filename or None.
     """
     try:
-        from fpdf import FPDF
-        
-        class PDF(FPDF):
-            def footer(self):
-                self.set_y(-15)
-                self.set_font("Arial", 'I', 8)
-                self.cell(0, 10, f"Trang {self.page_no()}", align="C")
-            
-        pdf = PDF()
-        
-        # Load Unicode fonts
-        fonts_dir = Path(__file__).resolve().parent.parent / "assets" / "fonts"
-        font_regular = str(fonts_dir / "Arial.ttf")
-        font_bold = str(fonts_dir / "Arial-Bold.ttf")
-        font_italic = str(fonts_dir / "Arial-Italic.ttf")
+        from app.services.pdf_generator_service import pdf_generator_service
 
-        if Path(font_regular).exists():
-            pdf.add_font("Arial", "", font_regular)
-            pdf.add_font("Arial", "B", font_bold if Path(font_bold).exists() else font_regular)
-            pdf.add_font("Arial", "I", font_italic if Path(font_italic).exists() else font_regular)
-            font_family = "Arial"
-        else:
-            font_family = "Helvetica"
-            content = content.encode("ascii", "ignore").decode("ascii")
-
-        pdf.add_page()
-        pdf.set_font(font_family, size=11)
-        pdf.multi_cell(0, 6, text=content)
-        pdf_bytes = bytes(pdf.output())
+        title = f"BÁO CÁO PHÂN TÍCH TOÀN CẢNH ĐA CHIỀU: {symbol.upper()}" if symbol else "BÁO CÁO PHÂN TÍCH TÀI CHÍNH TOÀN CẢNH"
+        pdf_bytes = pdf_generator_service.render_markdown_to_pdf(
+            markdown_text=content,
+            title=title,
+            symbol=symbol,
+            chart_image_bytes=chart_image_bytes,
+            risk_data=risk_data,
+        )
         size_kb = round(len(pdf_bytes) / 1024, 1)
 
         # Upload to R2
@@ -120,7 +113,6 @@ async def _upload_report_to_storage(content: str, filename: str) -> dict | None:
             local_file_path.write_bytes(pdf_bytes)
             url = f"/static/reports/{filename}"
             object_name = f"local://static/reports/{filename}"
-
 
         return {
             "url": url,
@@ -205,7 +197,11 @@ async def analyze_detail(
 
         date_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M")
         filename = f"detail_{symbol}_{date_str}.pdf"
-        upload_meta = await _upload_report_to_storage(markdown, filename)
+        upload_meta = await _upload_report_to_storage(
+            content=markdown,
+            filename=filename,
+            symbol=symbol,
+        )
 
         pdf_url = upload_meta.get("url") if upload_meta else None
 
@@ -313,19 +309,26 @@ async def get_risk_analysis(
             df['time'] = pd.to_datetime(df['time'])
             df.set_index('time', inplace=True)
 
-        # 2b. Fetch VN-Index as benchmark for REL_STRENGTH computation
+        # 2b. Fetch VN-Index as benchmark for REL_STRENGTH computation (Cached in-memory 1 hour)
+        global _cached_vnindex_df, _cached_vnindex_time
         benchmark_df = None
-        try:
-            vnindex_raw = market_service._fetch_historical_ohlcv(
-                symbol="VNINDEX", start_date=start_date, end_date=end_date
-            )
-            if vnindex_raw is not None and not vnindex_raw.empty:
-                vnindex_raw.rename(columns=str.lower, inplace=True)
-                vnindex_raw['time'] = pd.to_datetime(vnindex_raw['time'])
-                vnindex_raw.set_index('time', inplace=True)
-                benchmark_df = vnindex_raw
-        except Exception as bench_err:
-            logger.warning("Could not fetch VNINDEX benchmark: %s", bench_err)
+        now_utc = datetime.now(timezone.utc)
+        if _cached_vnindex_df is not None and _cached_vnindex_time and (now_utc - _cached_vnindex_time).total_seconds() < 3600:
+            benchmark_df = _cached_vnindex_df
+        else:
+            try:
+                vnindex_raw = market_service._fetch_historical_ohlcv(
+                    symbol="VNINDEX", start_date=start_date, end_date=end_date
+                )
+                if vnindex_raw is not None and not vnindex_raw.empty:
+                    vnindex_raw.rename(columns=str.lower, inplace=True)
+                    vnindex_raw['time'] = pd.to_datetime(vnindex_raw['time'])
+                    vnindex_raw.set_index('time', inplace=True)
+                    benchmark_df = vnindex_raw
+                    _cached_vnindex_df = benchmark_df
+                    _cached_vnindex_time = now_utc
+            except Exception as bench_err:
+                logger.warning("Could not fetch VNINDEX benchmark: %s", bench_err)
 
         risk_service = RiskScoringService()
         risk_res = risk_service.evaluate(df, benchmark_df=benchmark_df)

@@ -319,7 +319,37 @@ async def generate_comprehensive_report(
         if request.include_pdf_export:
             date_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M")
             filename = f"comprehensive_{symbol}_{date_str}.pdf"
-            upload_meta = await _upload_report_to_storage(report_markdown, filename)
+
+            # Generate correlation chart image
+            chart_bytes = None
+            try:
+                from app.services.pdf_generator_service import generate_correlation_chart_image
+                from app.services.market_service import market_service
+                from datetime import timedelta
+
+                start_date = (datetime.now() - timedelta(days=150)).strftime("%Y-%m-%d")
+                end_date = datetime.now().strftime("%Y-%m-%d")
+                stock_df = market_service._fetch_historical_ohlcv(symbol=symbol, start_date=start_date, end_date=end_date)
+                benchmark_df = market_service._fetch_historical_ohlcv(symbol="VNINDEX", start_date=start_date, end_date=end_date)
+
+                chart_bytes = generate_correlation_chart_image(
+                    symbol=symbol,
+                    stock_df=stock_df,
+                    benchmark_df=benchmark_df,
+                    buy_score=risk_data.get("buy_score", 50),
+                    sell_score=risk_data.get("sell_score", 50),
+                    f_score=risk_data.get("f_score"),
+                )
+            except Exception as chart_err:
+                logger.warning("[Finance Router] Could not generate correlation chart for %s: %s", symbol, chart_err)
+
+            upload_meta = await _upload_report_to_storage(
+                content=report_markdown,
+                filename=filename,
+                symbol=symbol,
+                chart_image_bytes=chart_bytes,
+                risk_data=risk_data,
+            )
 
             if upload_meta:
                 pdf_url = upload_meta.get("url")
