@@ -11,7 +11,7 @@
 
 **An enterprise-grade, automated financial analysis workspace that unifies quantitative technical data, deep PDF financial statement extraction, and local AI reasoning into a single seamless dashboard.**
 
-[Explore Features](#-core-features--mvp-walkthrough) • [Quickstart](#-quickstart--installation) • [Architecture](#-system-architecture) • [Roadmap](#-roadmap)
+[Explore Features](#-core-features--mvp-walkthrough) • [Quickstart](#-quickstart--installation) • [Architecture](#-system-architecture) • [Roadmap](#-roadmap) • [Contact](#-contact--portfolio)
 
 </div>
 
@@ -228,6 +228,15 @@ npm run dev
 * [ ] Multi-portfolio backtesting simulator.
 * [ ] Webhook alerts for sudden risk score spikes via Telegram/Discord.
 * [ ] Exportable executive PDF briefings.
+
+---
+
+## Contact & Portfolio
+
+To explore my portfolio, request MVP account access, or discuss custom development and collaboration, please feel free to reach out:
+
+* 🌐 **Portfolio:** [https://trihuynh.omnimer.io.vn/](https://trihuynh.omnimer.io.vn/)
+* 📧 **Email:** [huynhminhtri1109@gmail.com](mailto:huynhminhtri1109@gmail.com)
 
 ---
 
