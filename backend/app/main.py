@@ -28,10 +28,19 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 
+from sqlalchemy import select, text
 from app.infra.database import async_session_maker, engine
-from sqlalchemy import text, select
-from app.routers import analyze_router, auth_router, market_router, news_router, watchlist_router, report_router
+from app.routers import (
+    analyze_router,
+    auth_router,
+    finance_analysis_router,
+    market_router,
+    news_router,
+    report_router,
+    watchlist_router,
+)
 from app.services import news_service, scanner_service
+
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -95,8 +104,10 @@ app.include_router(auth_router.router)
 app.include_router(market_router.router)
 app.include_router(news_router.router)
 app.include_router(analyze_router.router)
+app.include_router(finance_analysis_router.router)
 app.include_router(watchlist_router.router)
 app.include_router(report_router.router)
+
 
 
 # ---------------------------------------------------------------------------

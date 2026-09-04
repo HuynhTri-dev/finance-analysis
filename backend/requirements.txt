@@ -1,6 +1,8 @@
 # ─── FastAPI & Server ────────────────────────────────────────────────────────
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+
 
 # ─── Database & ORM ──────────────────────────────────────────────────────────
 sqlalchemy==2.0.51
@@ -30,6 +32,10 @@ boto3>=1.35.0
 markdown>=3.6
 fpdf2>=2.8.0
 
+# ─── Document Processing (BCTC PDF Extraction) ────────────────────────────────
+pypdf>=5.0.0
+
 # ─── Utilities ───────────────────────────────────────────────────────────────
 eval_type_backport>=0.2.0
 requests>=2.31.0
+

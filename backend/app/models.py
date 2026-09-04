@@ -372,3 +372,61 @@ class RiskAnalysisCache(Base):
         doc="Full JSON string of the risk scoring result for fast retrieval.",
     )
 
+
+class BCTCDocument(Base):
+    """
+    BCTCDocument entity storing uploaded financial statements (BCTC),
+    their Cloudflare R2 storage locations, and parsed metadata for persistent retrieval.
+    """
+    __tablename__ = "bctc_document"
+
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid4()),
+        doc="Document session ID (UUID) uniquely identifying the parsed BCTC.",
+    )
+    symbol: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        index=True,
+        nullable=True,
+        doc="Stock ticker symbol if recognized.",
+    )
+    filename: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        doc="Original filename of the uploaded PDF.",
+    )
+    storage_path: Mapped[str] = mapped_column(
+        String(500),
+        nullable=False,
+        doc="Storage object key in Cloudflare R2 or local static directory.",
+    )
+    markdown_url: Mapped[Optional[str]] = mapped_column(
+        String(1000),
+        nullable=True,
+        doc="Download or view URL for the markdown document.",
+    )
+    page_count: Mapped[int] = mapped_column(
+        Integer,
+        default=1,
+        doc="Total number of pages in the source PDF.",
+    )
+    tables_found: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        doc="Count of tabular structures extracted.",
+    )
+    extracted_metrics_json: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        doc="Serialized JSON of extracted fundamental metrics.",
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_utc_now,
+        index=True,
+        doc="Timestamp when the document was uploaded and processed.",
+    )
+
+

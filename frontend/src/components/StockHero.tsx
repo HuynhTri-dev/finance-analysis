@@ -8,7 +8,7 @@
 "use client";
 
 import React from "react";
-import { Bot, FileText, RefreshCw } from "lucide-react";
+import { Bot, FileText, RefreshCw, Sparkles, FileSpreadsheet } from "lucide-react";
 
 export interface StockHeroProps {
   activeSymbol: string;
@@ -19,6 +19,10 @@ export interface StockHeroProps {
   onAnalyze: () => void;
   isHolding?: boolean;
   recommendation?: any;
+  onGenerateComprehensive?: () => void;
+  isGeneratingComprehensive?: boolean;
+  hasActiveDoc?: boolean;
+  onOpenRightSidebar?: () => void;
 }
 
 export const StockHero: React.FC<StockHeroProps> = ({
@@ -30,6 +34,10 @@ export const StockHero: React.FC<StockHeroProps> = ({
   onAnalyze,
   isHolding = false,
   recommendation = null,
+  onGenerateComprehensive,
+  isGeneratingComprehensive = false,
+  hasActiveDoc = false,
+  onOpenRightSidebar,
 }) => {
   const quote = symbolDetail?.quote || {};
   const isPriceUp = (quote.change || 0) > 0;
@@ -90,7 +98,23 @@ export const StockHero: React.FC<StockHeroProps> = ({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center space-x-2 sm:space-x-2.5">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+          {onGenerateComprehensive && (
+            <button
+              onClick={onGenerateComprehensive}
+              disabled={isGeneratingComprehensive || isAnalyzing}
+              className={`px-3 sm:px-3.5 py-2 text-xs font-semibold rounded-lg shadow-md transition-all flex items-center space-x-1.5 ${
+                isGeneratingComprehensive
+                  ? "bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 cursor-not-allowed opacity-90"
+                  : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-indigo-500/20 disabled:opacity-50"
+              }`}
+              title="Sinh báo cáo tài chính toàn cảnh 3 phần (Tài chính, Kỹ thuật, Khuyến nghị) kèm xuất PDF"
+            >
+              <Sparkles size={14} className={isGeneratingComprehensive ? "animate-spin" : "text-amber-300"} />
+              <span>{isGeneratingComprehensive ? "Đang tạo báo cáo 3 phần..." : "Báo Cáo Toàn Cảnh"}</span>
+            </button>
+          )}
+
           <button
             onClick={onGenerateQuickReport}
             disabled={isGeneratingQuickPdf || isAnalyzing}

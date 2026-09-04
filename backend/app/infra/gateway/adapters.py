@@ -109,44 +109,72 @@ async def call_ollama(
     thinking_disabled: bool = False,
 ) -> str:
     """
-    Call the local Ollama /api/generate endpoint.
+    Call the Ollama or remote OpenAI-compatible endpoint.
 
     Args:
         session: Shared aiohttp client session.
-        settings: Gateway settings containing the Ollama base URL.
+        settings: Gateway settings containing the Ollama base URL and optional API key.
         prompt: The text prompt to send.
-        model_name: Ollama model tag (e.g. "qwen3:0.6b").
+        model_name: Model tag or identifier.
         temperature: Sampling temperature override.
-        max_tokens: Maximum tokens to generate (maps to num_predict).
-        thinking_disabled: When True, attempts to set "think": false to
-            suppress <think> token generation on models that support it
-            (e.g. qwen3, Ollama >=0.6.0). Saves ~200-400ms on small tasks.
-            Falls back gracefully if the Ollama version does not support it.
+        max_tokens: Maximum tokens to generate.
+        thinking_disabled: When True, attempts to suppress thinking tokens on supported models.
 
     Returns:
-        The generated text response from Ollama.
+        The generated text response.
     """
-    options = {}
+    headers: dict[str, str] = {
+        "Content-Type": "application/json",
+    }
+    if getattr(settings, "ollama_api_key", None) and settings.ollama_api_key.strip():
+        headers["Authorization"] = f"Bearer {settings.ollama_api_key.strip()}"
+
+    options: dict[str, Any] = {}
     if temperature is not None:
         options["temperature"] = temperature
     if max_tokens is not None:
         options["num_predict"] = max_tokens
 
+    # Detect if the target URL is an OpenAI-compatible /chat/completions endpoint
+    is_openai_compat = any(
+        sub in settings.ollama_base_url.lower()
+        for sub in ["/chat/completions", "/paas/", "/v1/"]
+    )
+
     async def _post(use_think_param: bool) -> str:
-        payload: dict[str, Any] = {"model": model_name, "prompt": prompt, "stream": False}
-        if use_think_param:
-            payload["think"] = False
-        if options:
-            payload["options"] = options
-        async with session.post(settings.ollama_base_url, json=payload) as resp:
+        if is_openai_compat:
+            payload: dict[str, Any] = {
+                "model": model_name,
+                "messages": [{"role": "user", "content": prompt}],
+            }
+            if temperature is not None:
+                payload["temperature"] = temperature
+            if max_tokens is not None:
+                payload["max_tokens"] = max_tokens
+        else:
+            payload: dict[str, Any] = {"model": model_name, "prompt": prompt, "stream": False}
+            if use_think_param:
+                payload["think"] = False
+            if options:
+                payload["options"] = options
+
+        async with session.post(settings.ollama_base_url, headers=headers, json=payload) as resp:
             if resp.status == 429:
-                raise RateLimitError("Ollama 429")
-            if resp.status == 400 and use_think_param:
-                # Older Ollama versions (<0.6.0) return HTTP 400 when 'think'
-                # is an unrecognised field — raise a sentinel to trigger retry
+                raise RateLimitError("Ollama/LLM 429 Rate Limit")
+            if resp.status in (401, 403):
+                raise FatalError(f"Ollama/LLM Auth Error {resp.status}: {await resp.text()}")
+            if resp.status == 400 and use_think_param and not is_openai_compat:
                 raise _ThinkParamUnsupported()
             resp.raise_for_status()
             data = await resp.json()
+
+            # Handle OpenAI-compatible response format
+            if "choices" in data and len(data["choices"]) > 0:
+                choice = data["choices"][0]
+                message = choice.get("message", {})
+                return str(message.get("content", ""))
+
+            # Handle native Ollama response format
             response_text = data.get("response", "")
             return str(response_text)
 
@@ -155,8 +183,7 @@ async def call_ollama(
     except _ThinkParamUnsupported:
         # Retry without 'think' param for backward-compatibility with Ollama <0.6.0
         logger.warning(
-            "[Ollama] 'think' param not supported by this Ollama version — retrying without it. "
-            "Upgrade to Ollama >=0.6.0 to suppress <think> tokens and save latency."
+            "[Ollama] 'think' param not supported by this endpoint — retrying without it."
         )
         return await _post(use_think_param=False)
 

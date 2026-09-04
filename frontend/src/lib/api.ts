@@ -133,3 +133,59 @@ export const newsApi = {
   },
 };
 
+export const financeApi = {
+  uploadBCTC: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post('/finance/upload-bctc', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+  chatWithDocument: async (
+    docId: string,
+    query: string,
+    chatHistory: { role: string; content: string }[] = []
+  ) => {
+    const response = await apiClient.post('/finance/chat', {
+      doc_id: docId,
+      query,
+      chat_history: chatHistory,
+    });
+    return response.data;
+  },
+  generateComprehensiveReport: async (
+    symbol: string,
+    docId?: string | null,
+    includePdfExport: boolean = true
+  ) => {
+    const response = await apiClient.post('/finance/comprehensive-report', {
+      symbol,
+      doc_id: docId || undefined,
+      include_pdf_export: includePdfExport,
+    });
+    return response.data;
+  },
+  getSymbolRisk: async (symbol: string, forceRefresh: boolean = false) => {
+    const response = await apiClient.get(`/finance/risk/${symbol}`, {
+      params: { force_refresh: forceRefresh },
+    });
+    return response.data;
+  },
+};
+
+/**
+ * Resolves static or external URLs (e.g. Cloudflare R2 or local /static) to absolute URLs
+ */
+export const resolveFileUrl = (url?: string | null): string => {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  const baseUrl =
+    process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") ||
+    "http://127.0.0.1:8001";
+  return `${baseUrl}${url.startsWith("/") ? "" : "/"}${url}`;
+};
+
+export * from "./types";
+
+

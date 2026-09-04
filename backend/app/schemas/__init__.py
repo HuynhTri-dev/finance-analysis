@@ -9,6 +9,14 @@ from app.schemas.analyze_schema import (
     AnalysisResponse,
     DetailAnalysisRequest,
 )
+from app.schemas.finance_analysis_schema import (
+    BCTCUploadResponse,
+    ChatDocumentRequest,
+    ChatDocumentResponse,
+    ComprehensiveReportRequest,
+    ComprehensiveReportResponse,
+    FinancialMetricsExtracted,
+)
 from app.schemas.market_schema import (
     BatchQuoteItem,
     IndexQuote,
@@ -48,6 +56,13 @@ __all__ = [
     # Analysis
     "DetailAnalysisRequest",
     "AnalysisResponse",
+    # Finance Analysis (BDA Agent)
+    "FinancialMetricsExtracted",
+    "BCTCUploadResponse",
+    "ComprehensiveReportRequest",
+    "ComprehensiveReportResponse",
+    "ChatDocumentRequest",
+    "ChatDocumentResponse",
     # Reports
     "ReportResponse",
     "ReportItemResponse",
@@ -59,3 +74,4 @@ __all__ = [
     "MarketOverviewResponse",
     "StockDetailResponse",
 ]
+
