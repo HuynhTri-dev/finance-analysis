@@ -244,6 +244,11 @@ async def delete_report(report_id: str, db: AsyncSession = Depends(get_db)):
         )
         report_record = result.scalar_one_or_none()
 
+        # Sanitize report_id to prevent Path Traversal attacks
+        safe_name = Path(report_id).name
+        if not safe_name or safe_name in (".", "..") or ".." in report_id or "/" in report_id or "\\" in report_id:
+            raise HTTPException(status_code=400, detail="Mã định danh hoặc tên file báo cáo không hợp lệ.")
+
         provider = S3StorageProvider()
         if report_record:
             # 1. Delete from Cloudflare R2 / Local
@@ -251,8 +256,10 @@ async def delete_report(report_id: str, db: AsyncSession = Depends(get_db)):
             if storage_path.startswith("reports/"):
                 await provider.delete_file(storage_path)
             elif storage_path.startswith("local://"):
-                local_path = Path(__file__).resolve().parent.parent.parent / storage_path.replace("local://", "")
-                if local_path.exists():
+                clean_rel = storage_path.removeprefix("local://")
+                base_dir = Path(__file__).resolve().parent.parent.parent
+                local_path = (base_dir / clean_rel).resolve()
+                if local_path.is_relative_to(base_dir) and local_path.exists():
                     local_path.unlink()
 
             # 2. Delete from database
@@ -267,28 +274,28 @@ async def delete_report(report_id: str, db: AsyncSession = Depends(get_db)):
             # Fallback check if file exists in R2 or local static without DB record
             deleted_storage = False
             if provider.settings.r2_endpoint_url and provider.settings.bucket_name:
-                key = report_id if report_id.startswith("reports/") else f"reports/{report_id}"
+                key = f"reports/{safe_name}"
                 deleted_storage = await provider.delete_file(key)
 
             import tempfile
             try:
-                static_dir = Path(__file__).resolve().parent.parent.parent / "static" / "reports"
+                static_dir = (Path(__file__).resolve().parent.parent.parent / "static" / "reports").resolve()
             except OSError:
-                static_dir = Path(tempfile.gettempdir()) / "static" / "reports"
-            local_file = static_dir / report_id
-            if local_file.exists():
+                static_dir = (Path(tempfile.gettempdir()) / "static" / "reports").resolve()
+
+            local_file = (static_dir / safe_name).resolve()
+            if local_file.is_relative_to(static_dir) and local_file.exists():
                 local_file.unlink()
                 deleted_storage = True
-
 
             if deleted_storage:
                 return ReportDeleteResponse(
                     status="success",
-                    message=f"File báo cáo '{report_id}' đã được xoá khỏi bộ nhớ.",
+                    message=f"File báo cáo '{safe_name}' đã được xoá khỏi bộ nhớ.",
                     id=report_id,
                 )
 
-            raise HTTPException(status_code=404, detail=f"Không tìm thấy báo cáo '{report_id}'.")
+            raise HTTPException(status_code=404, detail=f"Không tìm thấy báo cáo '{safe_name}'.")
     except HTTPException:
         raise
     except Exception as e:

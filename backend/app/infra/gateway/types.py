@@ -9,6 +9,7 @@ import logging
 import sys
 from dataclasses import dataclass, field
 from enum import Enum
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -73,10 +74,8 @@ class GatewaySettings:
 
     def __post_init__(self) -> None:
         # Auto-normalize Ollama Cloud base URLs
-        clean_url = self.ollama_base_url.rstrip("/")
-        if clean_url in ("https://ollama.com", "http://ollama.com"):
-            self.ollama_base_url = "https://ollama.com/api/generate"
-        elif clean_url in ("https://ollama.com/api", "http://ollama.com/api"):
+        parsed = urlparse(self.ollama_base_url)
+        if parsed.netloc == "ollama.com":
             self.ollama_base_url = "https://ollama.com/api/generate"
 
         if not self.ollama_v1_base_url:

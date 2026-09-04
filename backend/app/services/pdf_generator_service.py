@@ -39,7 +39,7 @@ class FinancialReportPDF(FPDF):
         self,
         title: str = "BÁO CÁO PHÂN TÍCH TÀI CHÍNH TOÀN CẢNH",
         symbol: Optional[str] = None,
-        font_family: str = "Arial",
+        font_family: str = "DejaVu",
     ):
         super().__init__(orientation="P", unit="mm", format="A4")
         self.report_title = title
@@ -213,19 +213,19 @@ class PDFReportGenerator:
 
     def __init__(self):
         self.fonts_dir = Path(__file__).resolve().parent.parent / "assets" / "fonts"
-        self.font_regular = str(self.fonts_dir / "Arial.ttf")
-        self.font_bold = str(self.fonts_dir / "Arial-Bold.ttf")
-        self.font_italic = str(self.fonts_dir / "Arial-Italic.ttf")
+        self.font_regular = str(self.fonts_dir / "DejaVuSans.ttf")
+        self.font_bold = str(self.fonts_dir / "DejaVuSans-Bold.ttf")
+        self.font_italic = str(self.fonts_dir / "DejaVuSans-Oblique.ttf")
 
     def _init_pdf(self, title: str, symbol: Optional[str] = None) -> tuple[FinancialReportPDF, str]:
-        pdf = FinancialReportPDF(title=title, symbol=symbol, font_family="Arial")
+        pdf = FinancialReportPDF(title=title, symbol=symbol, font_family="DejaVu")
         pdf.alias_nb_pages()
 
         if Path(self.font_regular).exists():
-            pdf.add_font("Arial", "", self.font_regular)
-            pdf.add_font("Arial", "B", self.font_bold if Path(self.font_bold).exists() else self.font_regular)
-            pdf.add_font("Arial", "I", self.font_italic if Path(self.font_italic).exists() else self.font_regular)
-            font_family = "Arial"
+            pdf.add_font("DejaVu", "", self.font_regular)
+            pdf.add_font("DejaVu", "B", self.font_bold if Path(self.font_bold).exists() else self.font_regular)
+            pdf.add_font("DejaVu", "I", self.font_italic if Path(self.font_italic).exists() else self.font_regular)
+            font_family = "DejaVu"
         else:
             font_family = "Helvetica"
 

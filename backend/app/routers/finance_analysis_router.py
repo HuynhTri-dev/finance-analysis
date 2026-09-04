@@ -169,7 +169,23 @@ async def upload_bctc(
         )
 
     try:
-        file_bytes = await file.read()
+        # Enforce max 50MB file size limit to prevent memory exhaustion DoS
+        max_size = 50 * 1024 * 1024
+        chunks = []
+        total_size = 0
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                break
+            total_size += len(chunk)
+            if total_size > max_size:
+                raise HTTPException(
+                    status_code=413,
+                    detail="Dung lượng file vượt quá giới hạn cho phép (tối đa 50MB).",
+                )
+            chunks.append(chunk)
+
+        file_bytes = b"".join(chunks)
         if not file_bytes:
             raise HTTPException(status_code=400, detail="File PDF rỗng (0 bytes).")
 
