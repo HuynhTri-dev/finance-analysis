@@ -14,6 +14,9 @@ import {
   analyzeApi,
   newsApi,
   reportApi,
+  financeApi,
+  BCTCDocumentInfo,
+  ChatMessage,
 } from "@/lib/api";
 import {
   LoadingScreen,
@@ -119,6 +122,13 @@ export default function Home() {
   const [loadingPdfs, setLoadingPdfs] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
+  // BCTC Document & AI Chat State
+  const [activeDoc, setActiveDoc] = useState<BCTCDocumentInfo | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [isUploadingBCTC, setIsUploadingBCTC] = useState<boolean>(false);
+  const [isSendingChat, setIsSendingChat] = useState<boolean>(false);
+  const [isGeneratingComprehensive, setIsGeneratingComprehensive] = useState<boolean>(false);
+
   // User Authentication State
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
@@ -142,6 +152,15 @@ export default function Home() {
         }
       }
       setIsAuthChecking(false);
+
+      const savedDoc = localStorage.getItem("finance_active_bctc_doc");
+      if (savedDoc) {
+        try {
+          setActiveDoc(JSON.parse(savedDoc));
+        } catch (e) {
+          console.error("Error parsing active BCTC doc:", e);
+        }
+      }
 
       const saved = localStorage.getItem("finance_holdings");
       if (saved) {
@@ -266,15 +285,27 @@ export default function Home() {
   ): Promise<void> => {
     try {
       setLoadingDetail(true);
-      const [detailData, newsData] = await Promise.all([
+      const [detailRes, newsRes] = await Promise.allSettled([
         marketApi.getDetail(symbol, timeframe),
         newsApi.getNewsBySymbol(symbol),
       ]);
-      setSymbolDetail(detailData);
-      const articles = Array.isArray(newsData)
-        ? newsData
-        : newsData?.articles || newsData?.news || [];
-      setNews(articles);
+
+      if (detailRes.status === "fulfilled") {
+        setSymbolDetail(detailRes.value);
+      } else {
+        console.error("Error loading stock detail:", detailRes.reason);
+      }
+
+      if (newsRes.status === "fulfilled") {
+        const newsData = newsRes.value;
+        const articles = Array.isArray(newsData)
+          ? newsData
+          : newsData?.articles || newsData?.news || [];
+        setNews(articles);
+      } else {
+        console.warn("Could not load symbol news (timeout/error):", newsRes.reason);
+        setNews([]);
+      }
     } catch (e) {
       console.error("Error loading symbol detail:", e);
     } finally {
@@ -361,7 +392,10 @@ export default function Home() {
     setSidebarTab("chat");
     setIsAnalyzing(true);
     setAgentLogs([
-      { type: "system", content: "Đang tiến hành phân tích dữ liệu chuyên sâu..." },
+      {
+        type: "system",
+        content: `⚡ AI đang khởi tạo bài đánh giá chuyên sâu cho mã ${activeSymbol || "thị trường chung"}... Vui lòng đợi trong giây lát (hoặc xem file PDF báo cáo vừa tạo).`,
+      },
     ]);
 
     try {
@@ -372,16 +406,33 @@ export default function Home() {
         res = await analyzeApi.analyzeOverview();
       }
 
+      const content =
+        res?.markdown_content ||
+        res?.data?.markdown_content ||
+        "Không có nội dung phân tích.";
+      const pdfUrl = res?.pdf_url || res?.data?.pdf_url || null;
+
       setAgentLogs((prev) => [
         ...prev,
         {
           type: "markdown",
-          content: res.data?.markdown_content || "Không có nội dung phân tích.",
+          content,
         },
       ]);
 
-      if (res.data?.pdf_url) {
-        setAgentLogs((prev) => [...prev, { type: "pdf", content: res.data.pdf_url }]);
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: "assistant",
+          content,
+          pdf_url: pdfUrl,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+
+      if (pdfUrl) {
+        setAgentLogs((prev) => [...prev, { type: "pdf", content: pdfUrl }]);
         fetchPdfReports();
       }
     } catch (e) {
@@ -412,6 +463,16 @@ export default function Home() {
       const res = await reportApi.generateQuickReport(activeSymbol);
       if (res.pdf_url) {
         setAgentLogs((prev) => [...prev, { type: "pdf", content: res.pdf_url }]);
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            role: "assistant",
+            content: `Báo cáo PDF phân tích nhanh mã **${activeSymbol}** đã được tạo thành công.`,
+            pdf_url: res.pdf_url,
+            timestamp: new Date().toISOString(),
+          },
+        ]);
         fetchPdfReports();
       }
     } catch (e) {
@@ -422,6 +483,222 @@ export default function Home() {
     } finally {
       setIsGeneratingQuickPdf(false);
     }
+  };
+
+  /**
+   * Uploads corporate BCTC PDF, triggers Docling AI extraction & Cloudflare R2 markdown storage
+   */
+  const handleUploadBCTC = async (file: File) => {
+    if (!file) return;
+    setIsRightSidebarOpen(true);
+    setSidebarTab("chat");
+    setIsUploadingBCTC(true);
+
+    const tempId = Date.now().toString();
+    setChatMessages((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        role: "system",
+        content: `Đang tải lên và xử lý BCTC: **${file.name}** (${(file.size / (1024 * 1024)).toFixed(2)} MB)...`,
+        timestamp: new Date().toISOString(),
+      },
+    ]);
+
+    try {
+      const res = await financeApi.uploadBCTC(file);
+      setActiveDoc(res);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("finance_active_bctc_doc", JSON.stringify(res));
+      }
+
+      const revStr = res.metrics?.revenue ? `${Number(res.metrics.revenue).toLocaleString()} tỷ` : "Chưa xác định";
+      const patStr = res.metrics?.profit_after_tax ? `${Number(res.metrics.profit_after_tax).toLocaleString()} tỷ` : "Chưa xác định";
+      const opinionStr = res.metrics?.auditor_opinion || "Chấp nhận toàn phần";
+
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `### Trích Xuất Thành Công Báo Cáo Tài Chính!\n\n**Tập tin:** ${res.filename} (${res.page_count} trang)\n\n**Chỉ số tài chính bóc tách tự động:**\n- **Doanh thu thuần:** ${revStr}\n- **Lợi nhuận sau thuế:** ${patStr}\n- **Ý kiến kiểm toán:** ${opinionStr}\n\n*Toàn bộ bảng biểu & nội dung đã được lưu Markdown trên Cloudflare R2.* Bạn có thể bấm nút **"Xem Markdown R2"** để đối chiếu hoặc gõ câu hỏi để hỏi đáp trực tiếp theo từng trang!`,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+    } catch (err: any) {
+      console.error("Failed to upload BCTC:", err);
+      const errMsg = err?.response?.data?.detail || "Không thể xử lý file BCTC. Vui lòng kiểm tra định dạng PDF.";
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `**Lỗi tải BCTC:** ${errMsg}`,
+          isError: true,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+    } finally {
+      setIsUploadingBCTC(false);
+    }
+  };
+
+  /**
+   * Handles grounded Q&A with the active BCTC document (re-reading from Cloudflare R2 if needed)
+   */
+  const handleSendChatMessage = async (text: string) => {
+    if (!text.trim()) return;
+    const userMsgId = Date.now().toString();
+    const newMsg: ChatMessage = {
+      id: userMsgId,
+      role: "user",
+      content: text,
+      timestamp: new Date().toISOString(),
+    };
+
+    setChatMessages((prev) => [...prev, newMsg]);
+    setIsSendingChat(true);
+
+    try {
+      if (activeDoc?.doc_id) {
+        const history = chatMessages
+          .filter((m) => m.role === "user" || m.role === "assistant")
+          .map((m) => ({ role: m.role, content: m.content }))
+          .slice(-6);
+
+        const res = await financeApi.chatWithDocument(activeDoc.doc_id, text, history);
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: res.answer,
+            citations: res.citations || [],
+            disclaimer: res.disclaimer,
+            doc_id: res.doc_id,
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      } else {
+        if (activeSymbol) {
+          const res = await analyzeApi.analyzeSymbol(activeSymbol);
+          setChatMessages((prev) => [
+            ...prev,
+            {
+              id: (Date.now() + 1).toString(),
+              role: "assistant",
+              content: `*Chưa tải BCTC, AI phân tích tổng quan mã **${activeSymbol}**:*\n\n${res.data?.markdown_content || "Không có dữ liệu phân tích."}`,
+              pdf_url: res.data?.pdf_url || null,
+              timestamp: new Date().toISOString(),
+            },
+          ]);
+          if (res.data?.pdf_url) {
+            fetchPdfReports();
+          }
+        } else {
+          setChatMessages((prev) => [
+            ...prev,
+            {
+              id: (Date.now() + 1).toString(),
+              role: "assistant",
+              content: "Vui lòng chọn một mã cổ phiếu hoặc tải lên file PDF Báo Cáo Tài Chính để AI có thể phân tích số liệu chuẩn xác nhất.",
+              timestamp: new Date().toISOString(),
+            },
+          ]);
+        }
+      }
+    } catch (err: any) {
+      console.error("Chat error:", err);
+      const errMsg = err?.response?.data?.detail || "Đã xảy ra lỗi khi trao đổi với AI. Vui lòng thử lại.";
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `**Lỗi phản hồi:** ${errMsg}`,
+          isError: true,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+    } finally {
+      setIsSendingChat(false);
+    }
+  };
+
+  /**
+   * Generates 3-part comprehensive report (Financial deep-dive, Technical & Cash flow, Action strategy)
+   */
+  const handleGenerateComprehensiveReport = async () => {
+    const symbol = activeSymbol || "FPT";
+    if (isGeneratingComprehensive) return;
+
+    setIsRightSidebarOpen(true);
+    setSidebarTab("chat");
+    setIsGeneratingComprehensive(true);
+
+    const tempId = Date.now().toString();
+    setChatMessages((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        role: "system",
+        content: `Đang khởi tạo **Báo Cáo Toàn Cảnh 3 Phần** cho mã **${symbol}** (Phần 1: Tài chính chuyên sâu, Phần 2: Kỹ thuật & Dòng tiền, Phần 3: Khuyến nghị & Quản trị rủi ro)...`,
+        timestamp: new Date().toISOString(),
+      },
+    ]);
+
+    try {
+      const res = await financeApi.generateComprehensiveReport(symbol, activeDoc?.doc_id || null, true);
+
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: res.markdown_report,
+          pdf_url: res.pdf_url || null,
+          timestamp: res.created_at || new Date().toISOString(),
+        },
+      ]);
+
+      if (res.pdf_url) {
+        await fetchPdfReports();
+      }
+    } catch (err: any) {
+      console.error("Failed to generate comprehensive report:", err);
+      const errMsg = err?.response?.data?.detail || "Không thể sinh Báo Cáo Toàn Cảnh.";
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: `**Lỗi tạo báo cáo:** ${errMsg}`,
+          isError: true,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+    } finally {
+      setIsGeneratingComprehensive(false);
+    }
+  };
+
+  /**
+   * Closes the active BCTC document session
+   */
+  const handleClearActiveDoc = () => {
+    setActiveDoc(null);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("finance_active_bctc_doc");
+    }
+    setChatMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        role: "system",
+        content: "Đã đóng phiên làm việc với BCTC hiện tại.",
+        timestamp: new Date().toISOString(),
+      },
+    ]);
   };
 
   /**
@@ -529,6 +806,13 @@ export default function Home() {
                 onAnalyze={handleAnalyze}
                 isHolding={activeSymbol ? holdings.includes(activeSymbol) : false}
                 recommendation={symbolDetail ? getRecommendation(symbolDetail) : null}
+                onGenerateComprehensive={handleGenerateComprehensiveReport}
+                isGeneratingComprehensive={isGeneratingComprehensive}
+                hasActiveDoc={!!activeDoc}
+                onOpenRightSidebar={() => {
+                  setIsRightSidebarOpen(true);
+                  setSidebarTab("chat");
+                }}
               />
 
               {/* 2. Key Stats Strip */}
@@ -580,6 +864,16 @@ export default function Home() {
         onRefreshPdfs={fetchPdfReports}
         onDeleteReport={handleDeleteReport}
         deletingReportId={deletingReportId}
+        activeSymbol={activeSymbol}
+        activeDoc={activeDoc}
+        onUploadBCTC={handleUploadBCTC}
+        isUploadingBCTC={isUploadingBCTC}
+        chatMessages={chatMessages}
+        onSendMessage={handleSendChatMessage}
+        isSendingChat={isSendingChat}
+        onGenerateComprehensive={handleGenerateComprehensiveReport}
+        isGeneratingComprehensive={isGeneratingComprehensive}
+        onClearActiveDoc={handleClearActiveDoc}
       />
     </div>
   );

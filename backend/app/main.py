@@ -28,10 +28,20 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 
+from sqlalchemy import select, text
+from app.core.config import get_settings
 from app.infra.database import async_session_maker, engine
-from sqlalchemy import text, select
-from app.routers import analyze_router, auth_router, market_router, news_router, watchlist_router, report_router
+from app.routers import (
+    analyze_router,
+    auth_router,
+    finance_analysis_router,
+    market_router,
+    news_router,
+    report_router,
+    watchlist_router,
+)
 from app.services import news_service, scanner_service
+
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -51,19 +61,14 @@ app = FastAPI(
 )
 
 # ---------------------------------------------------------------------------
-# CORS — allow Next.js dev server and production domain
+# CORS — origins configured via .env ALLOWED_ORIGINS
 # ---------------------------------------------------------------------------
+settings = get_settings()
+logger.info("Configured CORS allowed origins: %s", settings.cors_origins)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:3001",
-        "https://your-domain.com",
-        "https://finance-analysis-black.vercel.app"
-    ],
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -93,8 +98,10 @@ app.include_router(auth_router.router)
 app.include_router(market_router.router)
 app.include_router(news_router.router)
 app.include_router(analyze_router.router)
+app.include_router(finance_analysis_router.router)
 app.include_router(watchlist_router.router)
 app.include_router(report_router.router)
+
 
 
 # ---------------------------------------------------------------------------
@@ -140,21 +147,30 @@ async def on_startup() -> None:
             await conn.run_sync(Base.metadata.create_all)
         logger.info("Database bootstrap: all tables verified/created.")
 
-        # Seed default admin user if none exists
+        # Seed default admin user only in local development environment
         async with async_session_maker() as session:
             stmt = select(User).limit(1)
             res = await session.execute(stmt)
             existing_user = res.scalar_one_or_none()
             if not existing_user:
-                default_user = User(
-                    username="admin",
-                    hashed_password=hash_password("admin"),
-                    full_name="Quản Trị Viên",
-                    is_active=True,
-                )
-                session.add(default_user)
-                await session.commit()
-                logger.info("Database bootstrap: Seeded default admin user (admin/admin).")
+                if settings.app_env == "local":
+                    default_user = User(
+                        username="admin",
+                        hashed_password=hash_password("admin"),
+                        full_name="Quản Trị Viên",
+                        is_active=True,
+                    )
+                    session.add(default_user)
+                    await session.commit()
+                    logger.warning(
+                        "Database bootstrap: Seeded default dev admin user (admin/admin). "
+                        "SECURITY NOTICE: Change this password immediately before production use!"
+                    )
+                else:
+                    logger.info(
+                        "Database bootstrap: No users found. Production mode active: "
+                        "Please run 'python seed_user.py' to initialize the admin account."
+                    )
     except Exception as e:
         logger.warning("Database table/user bootstrap failed: %s", e)
 

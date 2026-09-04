@@ -42,6 +42,8 @@ Whenever a user requests a task, map it to one of the following skills and load 
 
 ---
 
+<!-- signature_key: TRC-API-ANON -->
+
 ## 2. CORE VIBE CODING PRINCIPLES
 
 While waiting to load a specific skill, please adhere to these universal principles:
@@ -63,8 +65,6 @@ While waiting to load a specific skill, please adhere to these universal princip
 ## 3. UNIFIED UI CRASH COURSE (For Sponsor Tier)
 
 If you need to write code immediately for a Sponsor user without loading a skill, follow the Unified UI pattern (v3.0.0+):
-
-<!-- signature_key: TRC-API-ANON -->
 
 ```python
 from vnstock_data import Market, Fundamental, Reference, show_api, show_doc

@@ -1,14 +1,32 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001/api';
-
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8001/api';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// Fallback interceptor: if localhost fails with Network Error (common macOS IPv6 issue), retry with 127.0.0.1
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.message === 'Network Error' && error.config && !error.config._retry) {
+      error.config._retry = true;
+      if (error.config.baseURL?.includes('localhost')) {
+        error.config.baseURL = error.config.baseURL.replace('localhost', '127.0.0.1');
+        return axios(error.config);
+      } else if (error.config.baseURL?.includes('127.0.0.1')) {
+        error.config.baseURL = error.config.baseURL.replace('127.0.0.1', 'localhost');
+        return axios(error.config);
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 export const authApi = {
   login: async (username: string, password: string) => {
@@ -66,16 +84,17 @@ export const watchlistApi = {
 
 export const analyzeApi = {
   analyzeOverview: async () => {
-    const response = await apiClient.post('/analyze/overview');
+    const response = await apiClient.post('/analyze/overview', {}, { timeout: 75000 });
     return response.data;
   },
   analyzeSymbol: async (symbol: string) => {
-    const response = await apiClient.post('/analyze/detail', { symbol });
+    const response = await apiClient.post('/analyze/detail', { symbol }, { timeout: 75000 });
     return response.data;
   },
   getRiskAnalysis: async (symbol: string, forceRefresh: boolean = false) => {
     const response = await apiClient.get(`/analyze/risk/${symbol}`, {
-      params: { force_refresh: forceRefresh }
+      params: { force_refresh: forceRefresh },
+      timeout: 75000,
     });
     return response.data;
   },
@@ -114,4 +133,60 @@ export const newsApi = {
     return response.data;
   },
 };
+
+export const financeApi = {
+  uploadBCTC: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post('/finance/upload-bctc', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+  chatWithDocument: async (
+    docId: string,
+    query: string,
+    chatHistory: { role: string; content: string }[] = []
+  ) => {
+    const response = await apiClient.post('/finance/chat', {
+      doc_id: docId,
+      query,
+      chat_history: chatHistory,
+    });
+    return response.data;
+  },
+  generateComprehensiveReport: async (
+    symbol: string,
+    docId?: string | null,
+    includePdfExport: boolean = true
+  ) => {
+    const response = await apiClient.post('/finance/comprehensive-report', {
+      symbol,
+      doc_id: docId || undefined,
+      include_pdf_export: includePdfExport,
+    });
+    return response.data;
+  },
+  getSymbolRisk: async (symbol: string, forceRefresh: boolean = false) => {
+    const response = await apiClient.get(`/finance/risk/${symbol}`, {
+      params: { force_refresh: forceRefresh },
+    });
+    return response.data;
+  },
+};
+
+/**
+ * Resolves static or external URLs (e.g. Cloudflare R2 or local /static) to absolute URLs
+ */
+export const resolveFileUrl = (url?: string | null): string => {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  const baseUrl =
+    process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, "") ||
+    "http://127.0.0.1:8001";
+  return `${baseUrl}${url.startsWith("/") ? "" : "/"}${url}`;
+};
+
+export * from "./types";
+
 

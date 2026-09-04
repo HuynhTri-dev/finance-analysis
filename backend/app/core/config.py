@@ -21,18 +21,27 @@ class Settings(BaseSettings):
     )
 
     # ------------------------------------------------------------------
-    # Application
+    # Application & CORS
     # ------------------------------------------------------------------
-    app_name: str = "HRM Agent"
+    app_name: str = "AI Finance Analysis"
     app_env: str = "local"
     app_debug: bool = True
     app_host: str = "0.0.0.0"
     app_port: int = 8000
+    allowed_origins: str = Field(
+        default="http://localhost:3000,http://localhost:3001,http://localhost:3002,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002,https://finance-analysis-black.vercel.app",
+        description="Comma-separated list of allowed CORS origins, loaded from .env",
+    )
+
+    @property
+    def cors_origins(self) -> list[str]:
+        """Parsed list of allowed CORS origins from comma-separated string."""
+        return [origin.strip() for origin in self.allowed_origins.split(",") if origin.strip()]
 
     # ------------------------------------------------------------------
     # Database & Cache
     # ------------------------------------------------------------------
-    database_url: str = "postgresql+asyncpg://hrm_agent:hrm_agent@localhost:5432/hrm_agent"
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/finance_analysis"
     redis_url: str = "redis://localhost:6379/0"
     redis_password: str = ""
 
@@ -49,10 +58,6 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # External integrations
     # ------------------------------------------------------------------
-    hrm_provider: str = "odoo"
-    hrm_base_url: str = "http://localhost:8069"
-    hrm_api_key: str = "dev-hrm-token"
-
     llm_base_url: str = "http://localhost:8001/v1"
     llm_api_key: str = "EMPTY"
     llm_chat_model: str = "local-chat-model"
@@ -72,13 +77,9 @@ class Settings(BaseSettings):
     bucket_name: str = Field(default="", description="Cloudflare R2 Bucket Name")
 
     # ------------------------------------------------------------------
-    # Security & Audit Log
+    # Security & Telemetry
     # ------------------------------------------------------------------
     deepeval_telemetry_opt_out: str = "YES"
-    audit_log_encryption_key: str = Field(
-        default="",
-        description="Fernet 32-byte url-safe base64 key for encrypting sensitive HRM payload data",
-    )
 
     # ------------------------------------------------------------------
     # Model

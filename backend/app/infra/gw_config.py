@@ -31,42 +31,105 @@ def build_gateway_settings() -> GatewaySettings:
         gemini_api_key=settings.google_api_key,
         openrouter_api_key=settings.openrouter_api_key,
         ollama_base_url=settings.ollama_url,
+        ollama_api_key=settings.ollama_api_key,
         gemini_default_model=settings.gemini_router_model,
         openrouter_default_model=settings.openrouter_medical_model,
         ollama_default_model=settings.ollama_fallback_model,
         # ---- Default chain (general tasks) --------------------------------
         default_fallback_chain=[
+            ModelConfig(Platform.OLLAMA, settings.gpt_oss_120b, timeout_seconds=90),
+            ModelConfig(Platform.OLLAMA, settings.gpt_oss_20b, timeout_seconds=60),
             ModelConfig(Platform.GEMINI, settings.gemini_router_model, timeout_seconds=30),
-            ModelConfig(Platform.OLLAMA, settings.ollama_fallback_model, timeout_seconds=120),
         ],
         # ---- Per-task chains ----------------------------------------------
         task_fallback_chains={
             "router": [
                 ModelConfig(
                     Platform.OLLAMA,
-                    settings.gemma4_31b_cloud,
+                    settings.gpt_oss_20b,
                     timeout_seconds=30,
                     thinking_disabled=True,
                 ),
                 ModelConfig(
                     Platform.OLLAMA,
-                    settings.qwen3_5_0_8b,
+                    settings.gemma4_31b,
                     timeout_seconds=30,
                     thinking_disabled=True,
                 ),
             ],
             "generate_answer": [
-                ModelConfig(Platform.OLLAMA, settings.gemma4_31b_cloud, timeout_seconds=60),
-                ModelConfig(Platform.OLLAMA, settings.gpt_oss_20b_cloud, timeout_seconds=60),
+                ModelConfig(Platform.OLLAMA, settings.gemma4_31b, timeout_seconds=60),
+                ModelConfig(Platform.OLLAMA, settings.gpt_oss_120b, timeout_seconds=90),
             ],
             "extract": [
                 ModelConfig(
                     Platform.OLLAMA,
-                    settings.gpt_oss_20b_cloud,
-                    timeout_seconds=120,
+                    settings.gpt_oss_20b,
+                    timeout_seconds=90,
+                    thinking_disabled=True,
+                ),
+                ModelConfig(
+                    Platform.OLLAMA,
+                    settings.gpt_oss_120b,
+                    timeout_seconds=90,
                 ),
             ],
             "embedded": [ModelConfig(Platform.OLLAMA, settings.bgem3, timeout_seconds=120)],
+            # ---- Finance Analysis Task Chains (BDA Agent) -------------------
+            "finance_extract": [
+                ModelConfig(
+                    Platform.OLLAMA,
+                    settings.gpt_oss_20b,
+                    timeout_seconds=60,
+                    thinking_disabled=True,
+                ),
+                ModelConfig(
+                    Platform.OLLAMA,
+                    settings.gpt_oss_120b,
+                    timeout_seconds=90,
+                ),
+                ModelConfig(
+                    Platform.GEMINI,
+                    settings.gemini_router_model,
+                    timeout_seconds=45,
+                ),
+            ],
+            "finance_report": [
+                ModelConfig(
+                    Platform.OLLAMA,
+                    settings.gpt_oss_120b,
+                    timeout_seconds=90,
+                ),
+                ModelConfig(
+                    Platform.OLLAMA,
+                    settings.nemotron_3_super,
+                    timeout_seconds=90,
+                ),
+                ModelConfig(
+                    Platform.GEMINI,
+                    settings.gemini_router_model,
+                    timeout_seconds=60,
+                ),
+            ],
+            "finance_chat": [
+                ModelConfig(
+                    Platform.OLLAMA,
+                    settings.gemma4_31b,
+                    timeout_seconds=45,
+                    thinking_disabled=True,
+                ),
+                ModelConfig(
+                    Platform.OLLAMA,
+                    settings.gpt_oss_120b,
+                    timeout_seconds=60,
+                ),
+                ModelConfig(
+                    Platform.GEMINI,
+                    settings.gemini_router_model,
+                    timeout_seconds=45,
+                ),
+            ],
         },
     )
     return gw_settings
+

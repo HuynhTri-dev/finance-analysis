@@ -9,6 +9,7 @@ import logging
 import sys
 from dataclasses import dataclass, field
 from enum import Enum
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,7 @@ class GatewaySettings:
     gemini_api_key: str = ""
     openrouter_api_key: str = ""
     ollama_base_url: str = "http://localhost:11434/api/generate"
+    ollama_api_key: str = ""
 
     # Default model for each platform (overridable per-request)
     gemini_default_model: str = "gemini-2.0-flash"
@@ -71,6 +73,11 @@ class GatewaySettings:
     task_fallback_chains: dict[str, list[ModelConfig]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        # Auto-normalize Ollama Cloud base URLs
+        parsed = urlparse(self.ollama_base_url)
+        if parsed.netloc == "ollama.com":
+            self.ollama_base_url = "https://ollama.com/api/generate"
+
         if not self.ollama_v1_base_url:
             self.ollama_v1_base_url = (
                 self.ollama_base_url.removesuffix("/api/generate").rstrip("/") + "/v1"
@@ -79,8 +86,8 @@ class GatewaySettings:
         # Provide a sensible default chain if none supplied
         if not self.default_fallback_chain:
             self.default_fallback_chain = [
-                ModelConfig(Platform.GEMINI, self.gemini_default_model),
                 ModelConfig(Platform.OLLAMA, self.ollama_default_model),
+                ModelConfig(Platform.GEMINI, self.gemini_default_model),
             ]
 
 

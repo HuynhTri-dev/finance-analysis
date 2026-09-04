@@ -40,52 +40,38 @@ async def get_db() -> AsyncSession:
 @router.post("/symbol/{symbol}", response_model=ReportResponse, summary="Generate Quick PDF Report")
 async def generate_symbol_report(symbol: str, db: AsyncSession = Depends(get_db)):
     """
-    Generates a quick PDF summary for a stock symbol, uploads to storage,
-    and records the resulting URL and metadata into Neon database.
+    Generates a quick PDF summary for a stock symbol with correlation charts and styled headers.
     """
     symbol = symbol.upper()
     try:
-        # 1. Fetch data
+        from app.routers.analyze_router import get_risk_analysis, _upload_report_to_storage
+        from app.services.pdf_generator_service import generate_correlation_chart_image
+        from datetime import timedelta
+
+        # 1. Fetch risk data & OHLCV history
+        risk_data = await get_risk_analysis(symbol=symbol, force_refresh=False, db=db)
+
+        start_date = (datetime.now() - timedelta(days=150)).strftime("%Y-%m-%d")
+        end_date = datetime.now().strftime("%Y-%m-%d")
+        stock_df = market_service._fetch_historical_ohlcv(symbol=symbol, start_date=start_date, end_date=end_date)
+        benchmark_df = market_service._fetch_historical_ohlcv(symbol="VNINDEX", start_date=start_date, end_date=end_date)
+
+        # Generate chart bytes
+        chart_bytes = generate_correlation_chart_image(
+            symbol=symbol,
+            stock_df=stock_df,
+            benchmark_df=benchmark_df,
+            buy_score=risk_data.get("buy_score", 50),
+            sell_score=risk_data.get("sell_score", 50),
+            f_score=risk_data.get("f_score"),
+        )
+
+        # 2. Build structured Markdown summary for quick report
         ohlcv = market_service.get_stock_history(symbol=symbol)
-        symbol_news = await news_service.get_news_by_symbol(db, symbol=symbol, limit=10)
-
-        fonts_dir = Path(__file__).resolve().parent.parent / "assets" / "fonts"
-        font_regular = str(fonts_dir / "Arial.ttf")
-        font_bold = str(fonts_dir / "Arial-Bold.ttf")
-        font_italic = str(fonts_dir / "Arial-Italic.ttf")
-
-        # 2. Create PDF Template
-        class PDF(FPDF):
-            def header(self):
-                self.set_font("Arial", 'B', 15)
-                self.cell(0, 10, f"BÁO CÁO TỔNG HỢP CỔ PHIẾU: {symbol}", align="C", new_x="LMARGIN", new_y="NEXT")
-                self.ln(5)
-
-            def footer(self):
-                self.set_y(-15)
-                self.set_font("Arial", 'I', 8)
-                self.cell(0, 10, f"Trang {self.page_no()}", align="C")
-
-        pdf = PDF()
-
-        # Load Unicode fonts before add_page()
-        if Path(font_regular).exists():
-            pdf.add_font("Arial", "", font_regular)
-            pdf.add_font("Arial", "B", font_bold if Path(font_bold).exists() else font_regular)
-            pdf.add_font("Arial", "I", font_italic if Path(font_italic).exists() else font_regular)
-            font_family = "Arial"
-        else:
-            font_family = "Helvetica"
-
-        pdf.add_page()
-        pdf.set_font(font_family, size=12)
-
-        # Section 1: Price History
-        pdf.set_font(font_family, "B", size=14)
-        pdf.cell(0, 10, "1. Thông tin giao dịch gần nhất", new_x="LMARGIN", new_y="NEXT")
-        pdf.set_font(font_family, size=11)
+        symbol_news = await news_service.get_news_by_symbol(db, symbol=symbol, limit=8)
 
         records = ohlcv.get("records", [])
+        latest_info = "• Chưa có dữ liệu giao dịch chi tiết."
         if records:
             latest = records[-1]
             date_str = latest.get("time", "")
@@ -93,67 +79,53 @@ async def generate_symbol_report(symbol: str, db: AsyncSession = Depends(get_db)
             vol_val = f"{latest.get('volume', 0):,}" if isinstance(latest.get('volume'), (int, float)) else str(latest.get('volume'))
             high_val = f"{latest.get('high', 0):,}" if isinstance(latest.get('high'), (int, float)) else str(latest.get('high'))
             low_val = f"{latest.get('low', 0):,}" if isinstance(latest.get('low'), (int, float)) else str(latest.get('low'))
-            pdf.multi_cell(0, 6, text=f"Ngày: {date_str}\nGiá đóng cửa: {close_val}\nKhối lượng: {vol_val}\nCao/Thấp: {high_val} / {low_val}")
-        else:
-            pdf.multi_cell(0, 6, text="Không có dữ liệu giao dịch.")
+            latest_info = f"• Ngày giao dịch: {date_str}\n• Giá đóng cửa: {close_val} VND\n• Khối lượng: {vol_val}\n• Biên độ Cao / Thấp: {high_val} / {low_val} VND"
 
-        pdf.ln(5)
+        f_score_val = risk_data.get("f_score")
+        f_str = f"{f_score_val}/9" if f_score_val is not None else "Đang cập nhật"
+        scenario_str = risk_data.get("scenario", "Quan sát thị trường")
 
-        # Section 2: News
-        pdf.set_font(font_family, "B", size=14)
-        pdf.cell(0, 10, "2. Tin tức liên quan", new_x="LMARGIN", new_y="NEXT")
-        pdf.set_font(font_family, size=10)
-
+        news_txt_list = []
         if symbol_news:
-            for i, article in enumerate(symbol_news, 1):
-                title = article.get('title', '')
-                source = article.get('source', '')
-                pub_date = article.get('published_at', '')
-                if pub_date and hasattr(pub_date, "strftime"):
-                    pub_date = pub_date.strftime("%Y-%m-%d %H:%M")
+            for i, article in enumerate(symbol_news[:5], 1):
+                t = article.get("title", "")
+                s = article.get("source", "")
+                news_txt_list.append(f"- {i}. **{t}** ({s})")
+        news_section = "\n".join(news_txt_list) if news_txt_list else "- Chưa có tin tức nổi bật gần đây."
 
-                pdf.multi_cell(0, 6, text=f"{i}. {title} ({source} - {pub_date})")
-                pdf.ln(2)
-        else:
-            pdf.multi_cell(0, 6, text="Không có tin tức gần đây.")
+        quick_markdown = f"""# BÁO CÁO TỔNG HỢP CỔ PHIẾU: {symbol}
 
-        pdf_bytes = bytes(pdf.output())
-        size_kb = round(len(pdf_bytes) / 1024, 1)
+## PHẦN 1: THÔNG TIN GIAO DỊCH & RỦI RO THỊ TRƯỜNG
+{latest_info}
 
-        # 3. Save & Upload
+- Piotroski F-Score: `{f_str}`
+- Điểm Rủi ro Mua đuổi (BUY_RISK): `{risk_data.get('buy_score', 0)}/100` ({risk_data.get('buy_level', 'NORMAL')})
+- Điểm Rủi ro Bán cạn (SELL_RISK): `{risk_data.get('sell_score', 0)}/100` ({risk_data.get('sell_level', 'NORMAL')})
+
+> Kịch bản gợi ý: {scenario_str}
+
+## PHẦN 2: TIN TỨC & SỰ KIỆN NỔI BẬT
+{news_section}
+
+---
+*Báo cáo nhanh được tạo tự động bởi AI Finance Pro Engine.*
+"""
+
         date_str = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M")
         filename = f"report_quick_{symbol}_{date_str}.pdf"
-        object_name = f"reports/{filename}"
+        upload_meta = await _upload_report_to_storage(
+            content=quick_markdown,
+            filename=filename,
+            symbol=symbol,
+            chart_image_bytes=chart_bytes,
+            risk_data=risk_data,
+        )
 
-        url = None
-        try:
-            provider = S3StorageProvider()
-            if provider.settings.r2_endpoint_url and provider.settings.bucket_name:
-                await provider.upload_file(
-                    file_data=pdf_bytes,
-                    object_name=object_name,
-                    content_type="application/pdf",
-                )
-                url = await provider.get_file_url(object_name, expires_in=604800)
-        except Exception as storage_err:
-            logger.warning("R2 upload failed, falling back to local static storage: %s", storage_err)
+        url = upload_meta.get("url") if upload_meta else None
+        size_kb = upload_meta.get("size_kb", 0) if upload_meta else 0
+        object_name = upload_meta.get("object_name", f"reports/{filename}") if upload_meta else f"reports/{filename}"
 
-        if not url:
-            # Fallback to local static file
-            import tempfile
-            try:
-                static_dir = Path(__file__).resolve().parent.parent.parent / "static" / "reports"
-                static_dir.mkdir(parents=True, exist_ok=True)
-            except OSError:
-                static_dir = Path(tempfile.gettempdir()) / "static" / "reports"
-                static_dir.mkdir(parents=True, exist_ok=True)
-            local_file_path = static_dir / filename
-            local_file_path.write_bytes(pdf_bytes)
-            url = f"/static/reports/{filename}"
-            object_name = f"local://static/reports/{filename}"
-
-
-        # 4. Save metadata and URL into Neon PostgreSQL
+        # 3. Save metadata into Neon DB
         report_record = GeneratedReport(
             title=f"Báo Cáo Nhanh: {symbol}",
             report_type="quick_symbol",
@@ -272,6 +244,11 @@ async def delete_report(report_id: str, db: AsyncSession = Depends(get_db)):
         )
         report_record = result.scalar_one_or_none()
 
+        # Sanitize report_id to prevent Path Traversal attacks
+        safe_name = Path(report_id).name
+        if not safe_name or safe_name in (".", "..") or ".." in report_id or "/" in report_id or "\\" in report_id:
+            raise HTTPException(status_code=400, detail="Mã định danh hoặc tên file báo cáo không hợp lệ.")
+
         provider = S3StorageProvider()
         if report_record:
             # 1. Delete from Cloudflare R2 / Local
@@ -279,8 +256,10 @@ async def delete_report(report_id: str, db: AsyncSession = Depends(get_db)):
             if storage_path.startswith("reports/"):
                 await provider.delete_file(storage_path)
             elif storage_path.startswith("local://"):
-                local_path = Path(__file__).resolve().parent.parent.parent / storage_path.replace("local://", "")
-                if local_path.exists():
+                clean_rel = storage_path.removeprefix("local://")
+                base_dir = Path(__file__).resolve().parent.parent.parent
+                local_path = (base_dir / clean_rel).resolve()
+                if local_path.is_relative_to(base_dir) and local_path.exists():
                     local_path.unlink()
 
             # 2. Delete from database
@@ -295,28 +274,28 @@ async def delete_report(report_id: str, db: AsyncSession = Depends(get_db)):
             # Fallback check if file exists in R2 or local static without DB record
             deleted_storage = False
             if provider.settings.r2_endpoint_url and provider.settings.bucket_name:
-                key = report_id if report_id.startswith("reports/") else f"reports/{report_id}"
+                key = f"reports/{safe_name}"
                 deleted_storage = await provider.delete_file(key)
 
             import tempfile
             try:
-                static_dir = Path(__file__).resolve().parent.parent.parent / "static" / "reports"
+                static_dir = (Path(__file__).resolve().parent.parent.parent / "static" / "reports").resolve()
             except OSError:
-                static_dir = Path(tempfile.gettempdir()) / "static" / "reports"
-            local_file = static_dir / report_id
-            if local_file.exists():
+                static_dir = (Path(tempfile.gettempdir()) / "static" / "reports").resolve()
+
+            local_file = (static_dir / safe_name).resolve()
+            if local_file.is_relative_to(static_dir) and local_file.exists():
                 local_file.unlink()
                 deleted_storage = True
-
 
             if deleted_storage:
                 return ReportDeleteResponse(
                     status="success",
-                    message=f"File báo cáo '{report_id}' đã được xoá khỏi bộ nhớ.",
+                    message=f"File báo cáo '{safe_name}' đã được xoá khỏi bộ nhớ.",
                     id=report_id,
                 )
 
-            raise HTTPException(status_code=404, detail=f"Không tìm thấy báo cáo '{report_id}'.")
+            raise HTTPException(status_code=404, detail=f"Không tìm thấy báo cáo '{safe_name}'.")
     except HTTPException:
         raise
     except Exception as e:

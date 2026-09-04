@@ -106,3 +106,6 @@ class L1Cache:
 
 # Global L1 Cache instance
 l1_cache = L1Cache(default_ttl=5.0)
+
+# Global Document Session Cache instance (1 hour TTL for parsed BCTC documents)
+doc_session_cache = L1Cache(default_ttl=3600.0)
