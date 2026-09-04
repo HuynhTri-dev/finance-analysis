@@ -20,8 +20,6 @@ Whenever a user requests a task, map it to one of the following skills and load 
 - **`news-crawler`**: To fetch news from Vietnamese financial sources (CafeF, Vietstock, etc.).
 - **`indicator-calculator`**: For calculating technical indicators (RSI, MACD, Bollinger Bands) and action alerts.
 
-<!-- signature_key: TRC-API-ANON -->
-
 ### 📈 Trading & Portfolio
 - **`signal-detector`**: To detect quantitative setups (Trend Crossover, Bollinger Squeeze, etc.).
 - **`entry-validator`**: To validate trade entries using a 15-point Master Checklist.
@@ -43,6 +41,8 @@ Whenever a user requests a task, map it to one of the following skills and load 
 > ```
 
 ---
+
+<!-- signature_key: TRC-API-ANON -->
 
 ## 2. CORE VIBE CODING PRINCIPLES
 
